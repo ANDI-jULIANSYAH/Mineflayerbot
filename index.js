@@ -283,8 +283,3 @@ async function autoDropAll() {
 }
 
 createBot();
-
-client.login(process.env.Dtoken)
-catch(error => {
-    console.log('cant login');
-})

@@ -3,6 +3,6 @@
     "mineflayer": "^4.29.0"
   }
   "engines": {
-  "node": ">=18 <23"
+    "node": ">=18 <23"
   }
 }

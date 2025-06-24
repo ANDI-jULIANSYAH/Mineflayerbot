@@ -1,7 +1,20 @@
+// Cek dan install mineflayer otomatis jika belum ada
+try {
+    require.resolve('mineflayer');
+} catch (e) {
+    console.log('mineflayer belum terinstall. Menginstall...');
+    const { execSync } = require('child_process');
+    execSync('npm install mineflayer', { stdio: 'inherit' });
+    console.log('Install mineflayer selesai. Silakan jalankan ulang program.');
+    process.exit(0);
+}
 
 const mineflayer = require("mineflayer");
 const fs = require("fs");
 const path = require("path");
+const express = require('express')
+const app = express()
+const PORT = process.env.PORT || 3000
 
 let startTime = null;
 let logBuffer = [];
@@ -201,33 +214,34 @@ rl.on('line', async (input) => {
     // Fitur auto shop mobdrops
     if (input.startsWith('/auto')) {
         let loop = 0;
-        const maxLoop = 5000;
+        const maxLoop = 500;
         console.log(`[AUTO] Memulai auto shop mobdrops sebanyak ${maxLoop} kali...`);
         for (loop = 1; loop <= maxLoop; loop++) {
             try {
                 console.log(`[AUTO] Loop ke-${loop}`);
                 globalBot.chat('/shop mobdrops');
                 // Tunggu window terbuka
-                const window = await waitWindowOpen(4500);
+                const window = await waitWindowOpen(500);
                 printChest(window, '[AUTO] Data chest awal:');
 
-                // Klik slot 20
+                // Klik slot 11
                 await globalBot.clickWindow(11, 0, 0);
-                await delay(800);
+                await delay(50);
                 printChest(window, '[AUTO] Setelah klik slot 11:');
 
+                // Klik slot 31
                 await globalBot.clickWindow(31, 0, 0);
-                await delay(500);
+                await delay(50);
                 printChest(window, '[AUTO] Setelah klik slot 31:');
 
                 // Klik slot 8
                 await globalBot.clickWindow(8, 0, 0);
-                await delay(500);
+                await delay(50);
                 printChest(window, '[AUTO] Setelah klik slot 8:');
 
                 // Tutup window
                 globalBot.closeWindow(window);
-                await delay(1000);
+                await delay(100);
             } catch (err) {
                 console.log(`[AUTO] Error pada loop ke-${loop}:`, err.message);
                 break;
@@ -281,5 +295,8 @@ async function autoDropAll() {
     }
     console.log('[AUTO] Semua item sudah di-drop.');
 }
+
+app.get('/', (req, res) => res.send('Bot is running!'))
+app.listen(PORT, () => console.log(`Web server running on port ${PORT}`))
 
 createBot();

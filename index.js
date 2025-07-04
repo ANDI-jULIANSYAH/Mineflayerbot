@@ -1,3 +1,14 @@
+// Cek dan install mineflayer-pathfinder otomatis jika belum ada
+try {
+    require.resolve("mineflayer-pathfinder");
+} catch (e) {
+    console.log("mineflayer-pathfinder belum terinstall. Menginstall...");
+    const { execSync } = require("child_process");
+    execSync("npm install mineflayer-pathfinder", { stdio: "inherit" });
+    console.log("Install mineflayer-pathfinder selesai. Silakan jalankan ulang program.");
+    process.exit(0);
+}
+
 // Cek dan install mineflayer otomatis jika belum ada
 try {
     require.resolve("mineflayer");

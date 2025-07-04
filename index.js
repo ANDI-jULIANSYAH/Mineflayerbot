@@ -1,3 +1,14 @@
+// Cek dan install socket.io otomatis jika belum ada
+try {
+    require.resolve("socket.io");
+} catch (e) {
+    console.log("socket.io belum terinstall. Menginstall...");
+    const { execSync } = require("child_process");
+    execSync("npm install socket.io", { stdio: "inherit" });
+    console.log("Install socket.io selesai. Silakan jalankan ulang program.");
+    process.exit(0);
+}
+
 // Cek dan install mineflayer-pathfinder otomatis jika belum ada
 try {
     require.resolve("mineflayer-pathfinder");

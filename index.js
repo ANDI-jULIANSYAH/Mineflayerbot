@@ -169,43 +169,11 @@ function createBot(config) {
     bot.on("message", async (message) => {
         const messageText = message.toString();
 
-        // Filter pesan health/mana
-        const healthManaRegex = /^\[BOT-[^\]]+\] \[\d{1,2}:\d{2}:\d{2} (AM|PM)\] \d+\/\d+❤ \d+\/\d+ Mana$/;
-        if (healthManaRegex.test(messageText)) {
-            // Jangan log dan jangan broadcast ke web
-            return;
-        }
+        // Filter pesan health/mana agar tidak tampil di console & web
+        if (/^\s*\d+\/\d+❤\s+\d+\/\d+\s*Mana\s*$/i.test(messageText)) return;
 
         console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
         
-        // Chat trigger actions
-        if (messageText.includes("bone_reload")) {
-            console.log(`[BOT-${botId}] Detected bone_reload command`);
-            bot.chat("/r baik bot akan segera melakukan home bonemeal dan auto");
-            setTimeout(async () => {
-                bot.chat("/home bonemeal");
-                console.log(`[BOT-${botId}] Executed /home bonemeal`);
-                setTimeout(async () => {
-                    await executeAutoShop(bot);
-                }, 2000);
-            }, 1000);
-        }
-        
-        // Deteksi pesan pembelian shop dan tutup chest jika terbuka
-        if (
-            messageText.includes("Shop > You bought") &&
-            bot.currentWindow
-        ) {
-            bot.closeWindow(bot.currentWindow);
-            console.log(`[BOT-${botId}] Chest otomatis ditutup setelah pembelian.`);
-        }
-
-        // Deteksi inventory penuh dari pesan server
-        if (messageText.includes("Shop > You don't have enough free space in your inventory.")) {
-            console.log(`[BOT-${botId}] Deteksi inventory penuh dari pesan server, drop semua item...`);
-            await autoDropAll(bot);
-        }
-
         // Update online players list for this bot
         if (messageText.includes("memasuki permainan") || messageText.includes("joined the game")) {
             updateOnlinePlayers(botId);
@@ -218,41 +186,6 @@ function createBot(config) {
             timestamp: new Date().toISOString(),
             message: messageText
         });
-
-        // Tambahan: Deteksi teleportasi ke hub dan auto /login + /survival
-        if (messageText.includes("[Sistem] Sedang mencoba teleportasi ke hub..")) {
-            console.log(`[BOT-${botId}] Detected teleport to hub, will try to /login and /survival`);
-            let attempts = 0;
-            const maxAttempts = 10;
-            let success = false;
-
-            while (attempts < maxAttempts && !success) {
-                try {
-                    bot.chat(`/login ${config.password}`);
-                    await delay(2000);
-                    bot.chat("/survival");
-                    console.log(`[BOT-${botId}] Attempted /login and /survival (attempt ${attempts + 1})`);
-
-                    // Tunggu pesan join survival atau gagal
-                    success = await waitForSurvivalJoin(bot, 60000); // 1 menit
-                    if (success) {
-                        console.log(`[BOT-${botId}] Berhasil masuk survival`);
-                        break;
-                    } else {
-                        console.log(`[BOT-${botId}] Gagal masuk survival, mencoba lagi...`);
-                    }
-                } catch (err) {
-                    console.log(`[BOT-${botId}] Error saat mencoba masuk survival:`, err.message);
-                }
-                attempts++;
-                if (!success && attempts < maxAttempts) {
-                    await delay(60000); // Jeda 1 menit sebelum mencoba lagi
-                }
-            }
-            if (!success) {
-                console.log(`[BOT-${botId}] Gagal masuk survival setelah ${maxAttempts} percobaan.`);
-            }
-        }
     });
 
     bot.on("end", (reason) => {
@@ -288,6 +221,46 @@ function createBot(config) {
         broadcastStats();
     });
 
+    // Tambahkan penjadwalan survival jam 01.00
+    bot.once('login', () => {
+        scheduleSurvivalAt1AM(bot);
+    });
+
+    // Handler untuk kick "Server is Restarting"
+    bot.on("kicked", (reason) => {
+        console.log(`[BOT-${botId}] Kicked:`, reason);
+        const stats = allBotStats.get(botId);
+        stats.status = 'Kicked';
+        allBotStats.set(botId, stats);
+        broadcastStats();
+
+        // Deteksi pesan restart
+        if (typeof reason === 'string' && reason.includes('Server is Restarting')) {
+            setTimeout(() => {
+                autoJoinSurvival(bot);
+            }, 5000);
+        }
+    });
+
+    // Handler jika join survival gagal (deteksi pesan join survival)
+    bot.on("message", async (message) => {
+        const messageText = message.toString();
+        // ...existing code...
+
+        // Deteksi gagal join survival
+        if (
+            messageText.includes("You are not logged in") ||
+            messageText.includes("You must login") ||
+            messageText.includes("You are not in survival") ||
+            messageText.includes("failed to join survival")
+        ) {
+            console.log(`[BOT-${bot.botId}] Deteksi gagal join survival, mencoba ulang...`);
+            autoJoinSurvival(bot);
+        }
+
+        // ...existing code...
+    });
+
     return bot;
 }
 
@@ -313,54 +286,6 @@ const rl = readline.createInterface({
 });
 
 rl.on('line', async (input) => {
-    if (input.startsWith('/dropall')) {
-        const args = input.split(' ');
-        const botId = args[1] || 'all';
-        
-        if (botId === 'all') {
-            for (const [id, bot] of bots) {
-                await autoDropAll(bot);
-            }
-        } else {
-            const bot = bots.get(botId);
-            if (bot) {
-                await autoDropAll(bot);
-            } else {
-                console.log(`Bot ${botId} tidak ditemukan.`);
-            }
-        }
-        return;
-    }
-
-    if (input.startsWith('/auto')) {
-        const args = input.split(' ');
-        const botId = args[1] || 'all';
-        
-        if (botId === 'all') {
-            for (const [id, bot] of bots) {
-                executeAutoShop(bot);
-            }
-        } else {
-            const bot = bots.get(botId);
-            if (bot) {
-                await executeAutoShop(bot);
-            } else {
-                console.log(`Bot ${botId} tidak ditemukan.`);
-            }
-        }
-        return;
-    }
-
-    if (input.startsWith('/list')) {
-        console.log('Active bots:');
-        for (const [id, bot] of bots) {
-            const stats = allBotStats.get(id);
-            console.log(`- Bot ${id}: ${stats.username} (${stats.status})`);
-        }
-        return;
-    }
-
-    // Default: chat ke semua bot atau bot spesifik
     const args = input.split(' ');
     if (args[0].startsWith('@')) {
         const botId = args[0].substring(1);
@@ -373,7 +298,6 @@ rl.on('line', async (input) => {
             console.log(`Bot ${botId} tidak ditemukan.`);
         }
     } else {
-        // Chat ke semua bot
         for (const [id, bot] of bots) {
             bot.chat(input);
         }
@@ -397,19 +321,6 @@ function waitWindowOpen(bot, timeout = 5000) {
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function autoDropAll(bot) {
-    const items = bot.inventory.items();
-    if (items.length === 0) {
-        console.log(`[BOT-${bot.botId}] Inventory kosong.`);
-        return;
-    }
-    for (const item of items) {
-        await bot.tossStack(item);
-        console.log(`[BOT-${bot.botId}] Drop ${item.name} x${item.count}`);
-    }
-    console.log(`[BOT-${bot.botId}] Semua item sudah di-drop.`);
 }
 
 // Serve static files
@@ -571,7 +482,7 @@ server.listen(PORT, () => {
     }
 });
 
-// Start with one default bot (configurable via Heroku env)
+// Start with one default bot (configurable via env)
 setTimeout(() => {
     const defaultConfig = {
         id: 'default',
@@ -582,141 +493,45 @@ setTimeout(() => {
         version: process.env.BOT_VERSION || '1.18.2',
         autoReconnect: true
     };
-
+    
     const bot = createBot(defaultConfig);
     bots.set('default', bot);
     botConfigs.push(defaultConfig);
     activeBots++;
 }, 1000);
 
-// Tambahkan di dalam fungsi createBot, pada event bot.on("message", ...)
-bot.on("message", async (message) => {
-    const messageText = message.toString();
-
-    // Filter pesan health/mana
-    const healthManaRegex = /^\[BOT-[^\]]+\] \[\d{1,2}:\d{2}:\d{2} (AM|PM)\] \d+\/\d+❤ \d+\/\d+ Mana$/;
-    if (healthManaRegex.test(messageText)) {
-        // Jangan log dan jangan broadcast ke web
-        return;
-    }
-
-    console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
-    
-    // Chat trigger actions
-    if (messageText.includes("bone_reload")) {
-        console.log(`[BOT-${botId}] Detected bone_reload command`);
-        bot.chat("/r baik bot akan segera melakukan home bonemeal dan auto");
-        setTimeout(async () => {
-            bot.chat("/home bonemeal");
-            console.log(`[BOT-${botId}] Executed /home bonemeal`);
-            setTimeout(async () => {
-                await executeAutoShop(bot);
-            }, 2000);
-        }, 1000);
-    }
-    
-    // Deteksi pesan pembelian shop dan tutup chest jika terbuka
-    if (
-        messageText.includes("Shop > You bought") &&
-        bot.currentWindow
-    ) {
-        bot.closeWindow(bot.currentWindow);
-        console.log(`[BOT-${botId}] Chest otomatis ditutup setelah pembelian.`);
-    }
-
-    // Deteksi inventory penuh dari pesan server
-    if (messageText.includes("Shop > You don't have enough free space in your inventory.")) {
-        console.log(`[BOT-${botId}] Deteksi inventory penuh dari pesan server, drop semua item...`);
-        await autoDropAll(bot);
-    }
-
-    // Update online players list for this bot
-    if (messageText.includes("memasuki permainan") || messageText.includes("joined the game")) {
-        updateOnlinePlayers(botId);
-    }
-    
-    // Broadcast message to web clients
-    io.emit('chatMessage', {
-        botId: botId,
-        username: config.username,
-        timestamp: new Date().toISOString(),
-        message: messageText
-    });
-
-    // Tambahan: Deteksi teleportasi ke hub dan auto /login + /survival
-    if (messageText.includes("[Sistem] Sedang mencoba teleportasi ke hub..")) {
-        console.log(`[BOT-${botId}] Detected teleport to hub, will try to /login and /survival`);
-        let attempts = 0;
-        const maxAttempts = 10;
-        let success = false;
-
-        while (attempts < maxAttempts && !success) {
-            try {
-                bot.chat(`/login ${config.password}`);
-                await delay(2000);
-                bot.chat("/survival");
-                console.log(`[BOT-${botId}] Attempted /login and /survival (attempt ${attempts + 1})`);
-
-                // Tunggu pesan join survival atau gagal
-                success = await waitForSurvivalJoin(bot, 60000); // 1 menit
-                if (success) {
-                    console.log(`[BOT-${botId}] Berhasil masuk survival`);
-                    break;
-                } else {
-                    console.log(`[BOT-${botId}] Gagal masuk survival, mencoba lagi...`);
-                }
-            } catch (err) {
-                console.log(`[BOT-${botId}] Error saat mencoba masuk survival:`, err.message);
-            }
-            attempts++;
-            if (!success && attempts < maxAttempts) {
-                await delay(60000); // Jeda 1 menit sebelum mencoba lagi
-            }
+// Tambahkan fungsi auto join survival
+async function autoJoinSurvival(bot, maxRetry = 10) {
+    let retry = 0;
+    while (retry < maxRetry) {
+        try {
+            bot.chat(`/login ${bot.config.password}`);
+            await delay(2000);
+            bot.chat('/survival');
+            console.log(`[BOT-${bot.botId}] Attempted to rejoin survival (try ${retry + 1}/${maxRetry})`);
+            await delay(60000); // 1 menit
+            // Cek status, jika sudah masuk survival bisa break
+            // (Anda bisa tambahkan pengecekan status di sini jika ada indikator)
+        } catch (e) {
+            console.log(`[BOT-${bot.botId}] Error auto join survival:`, e.message);
         }
-        if (!success) {
-            console.log(`[BOT-${botId}] Gagal masuk survival setelah ${maxAttempts} percobaan.`);
-        }
+        retry++;
     }
-});
+}
 
-// Helper function untuk menunggu pesan join survival atau gagal
-async function waitForSurvivalJoin(bot, timeout = 60000) {
-    return new Promise((resolve) => {
-        let resolved = false;
-        const joinSurvivalKeywords = [
-            "Selamat datang di dunia survival",
-            "Welcome to survival",
-            "Anda telah masuk ke dunia survival",
-            "You have joined survival"
-        ];
-        const failKeywords = [
-            "Gagal masuk ke survival",
-            "Failed to join survival",
-            "Anda belum login",
-            "You are not logged in"
-        ];
-
-        function onMessage(msg) {
-            const text = msg.toString();
-            if (joinSurvivalKeywords.some(k => text.includes(k))) {
-                cleanup();
-                resolve(true);
-            }
-            if (failKeywords.some(k => text.includes(k))) {
-                cleanup();
-                resolve(false);
-            }
-        }
-        function cleanup() {
-            if (!resolved) {
-                resolved = true;
-                bot.removeListener('message', onMessage);
-            }
-        }
-        bot.on('message', onMessage);
+// Penjadwalan ulang survival jam 01.00
+function scheduleSurvivalAt1AM(bot) {
+    const now = new Date();
+    const next1AM = new Date(now);
+    next1AM.setHours(1, 0, 0, 0);
+    if (now > next1AM) next1AM.setDate(now.getDate() + 1);
+    const msUntil1AM = next1AM - now;
+    setTimeout(() => {
+        bot.chat(`/login ${bot.config.password}`);
         setTimeout(() => {
-            cleanup();
-            resolve(false);
-        }, timeout);
-    });
+            bot.chat('/survival');
+            console.log(`[BOT-${bot.botId}] Scheduled /survival at 01:00`);
+        }, 2000);
+        scheduleSurvivalAt1AM(bot); // Reschedule for next day
+    }, msUntil1AM);
 }

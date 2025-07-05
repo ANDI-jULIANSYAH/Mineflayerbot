@@ -218,6 +218,41 @@ function createBot(config) {
             timestamp: new Date().toISOString(),
             message: messageText
         });
+
+        // Tambahan: Deteksi teleportasi ke hub dan auto /login + /survival
+        if (messageText.includes("[Sistem] Sedang mencoba teleportasi ke hub..")) {
+            console.log(`[BOT-${botId}] Detected teleport to hub, will try to /login and /survival`);
+            let attempts = 0;
+            const maxAttempts = 10;
+            let success = false;
+
+            while (attempts < maxAttempts && !success) {
+                try {
+                    bot.chat(`/login ${config.password}`);
+                    await delay(2000);
+                    bot.chat("/survival");
+                    console.log(`[BOT-${botId}] Attempted /login and /survival (attempt ${attempts + 1})`);
+
+                    // Tunggu pesan join survival atau gagal
+                    success = await waitForSurvivalJoin(bot, 60000); // 1 menit
+                    if (success) {
+                        console.log(`[BOT-${botId}] Berhasil masuk survival`);
+                        break;
+                    } else {
+                        console.log(`[BOT-${botId}] Gagal masuk survival, mencoba lagi...`);
+                    }
+                } catch (err) {
+                    console.log(`[BOT-${botId}] Error saat mencoba masuk survival:`, err.message);
+                }
+                attempts++;
+                if (!success && attempts < maxAttempts) {
+                    await delay(60000); // Jeda 1 menit sebelum mencoba lagi
+                }
+            }
+            if (!success) {
+                console.log(`[BOT-${botId}] Gagal masuk survival setelah ${maxAttempts} percobaan.`);
+            }
+        }
     });
 
     bot.on("end", (reason) => {

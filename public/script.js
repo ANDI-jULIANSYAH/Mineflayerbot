@@ -1,4 +1,3 @@
-
 const socket = io();
 
 // DOM elements
@@ -115,9 +114,9 @@ function createBotCard(stats) {
     const botCard = document.createElement('div');
     botCard.className = 'bot-card';
     botCard.setAttribute('data-bot-id', stats.id);
-    
+
     const statusClass = getStatusClass(stats.status);
-    
+
     botCard.innerHTML = `
         <div class="bot-header">
             <h3>${stats.username}</h3>
@@ -147,11 +146,6 @@ function createBotCard(stats) {
                 <label>Proxy:</label>
                 <span>${stats.proxy}</span>
             </div>
-        </div>
-        <div class="bot-actions">
-            <button class="btn btn-small" onclick="sendBotCommand('${stats.id}', '/auto')">Auto Shop</button>
-            <button class="btn btn-small" onclick="sendBotCommand('${stats.id}', '/dropall')">Drop All</button>
-            <button class="btn btn-small" onclick="sendBotCommand('${stats.id}', '/balance')">Balance</button>
         </div>
         <div class="bot-players">
             <label>Online Players (${stats.onlinePlayers.length}):</label>
@@ -184,12 +178,6 @@ function getStatusClass(status) {
         case 'kicked': return 'status-kicked';
         default: return 'status-unknown';
     }
-}
-
-// Send command to specific bot
-function sendBotCommand(botId, command) {
-    socket.emit('sendChat', { botId: botId, message: command });
-    addConsoleMessage(`> [BOT-${botId}] ${command}`, 'system');
 }
 
 // Update chat targets dropdown

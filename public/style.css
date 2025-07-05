@@ -1,4 +1,4 @@
-ss
+
 * {
     margin: 0;
     padding: 0;
@@ -227,86 +227,6 @@ h1 {
     margin: 2px;
     border-radius: 3px;
     font-size: 0.8em;
-}
-
-.mining-controls {
-    background: linear-gradient(135deg, #27ae60, #2ecc71);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-}
-
-.mining-controls h3 {
-    color: white;
-    margin-bottom: 15px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    padding-bottom: 10px;
-}
-
-.mining-form {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.mining-form select,
-.mining-form input {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 5px;
-    padding: 8px;
-    backdrop-filter: blur(10px);
-}
-
-.mining-form select:focus,
-.mining-form input:focus {
-    outline: none;
-    border-color: white;
-}
-
-.progress-fill.tool {
-    background: linear-gradient(90deg, #3498db, #2980b9);
-}
-
-.progress-fill.tool.low-durability {
-    background: linear-gradient(90deg, #e74c3c, #c0392b);
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-.mining-status.mining {
-    color: #27ae60;
-    font-weight: bold;
-}
-
-.mining-status.idle {
-    color: #7f8c8d;
-}
-
-.btn-success {
-    background-color: #27ae60;
-    color: white;
-}
-
-.btn-success:hover {
-    background-color: #229954;
-}
-
-.btn-warning {
-    background-color: #f39c12;
-    color: white;
-}
-
-.btn-warning:hover {
-    background-color: #e67e22;
 }
 
 .global-chat {

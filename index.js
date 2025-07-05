@@ -1,4 +1,3 @@
-
 // Cek dan install mineflayer otomatis jika belum ada
 try {
     require.resolve('mineflayer');
@@ -520,7 +519,14 @@ function broadcastStats() {
     io.emit('allStatsUpdate', Array.from(allBotStats.values()));
 }
 
-server.listen(PORT, '0.0.0.0', () => console.log(`Web server running on port ${PORT}`))
+server.listen(PORT, () => {
+    console.log(`Web server running on port ${PORT}`);
+    if (process.env.HEROKU_APP_NAME) {
+        console.log(`Akses web di: https://${process.env.HEROKU_APP_NAME}.herokuapp.com/`);
+    } else {
+        console.log('Akses web di: https://localmcbot-2885511c2fdc.herokuapp.com/');
+    }
+});
 
 // Start with one default bot
 setTimeout(() => {

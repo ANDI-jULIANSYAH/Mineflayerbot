@@ -168,6 +168,14 @@ function createBot(config) {
 
     bot.on("message", async (message) => {
         const messageText = message.toString();
+
+        // Filter pesan health/mana
+        const healthManaRegex = /^\[BOT-[^\]]+\] \[\d{1,2}:\d{2}:\d{2} (AM|PM)\] \d+\/\d+❤ \d+\/\d+ Mana$/;
+        if (healthManaRegex.test(messageText)) {
+            // Jangan log dan jangan broadcast ke web
+            return;
+        }
+
         console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
         
         // Chat trigger actions
@@ -528,20 +536,152 @@ server.listen(PORT, () => {
     }
 });
 
-// Start with one default bot
+// Start with one default bot (configurable via Heroku env)
 setTimeout(() => {
     const defaultConfig = {
         id: 'default',
-        username: 'Master1140ID',
-        password: 'MASTER09',
-        host: 'localmc.club',
-        port: 23028,
-        version: '1.18.2',
+        username: process.env.BOT_USERNAME || 'Master1140ID',
+        password: process.env.BOT_PASSWORD || 'MASTER09',
+        host: process.env.BOT_HOST || 'localmc.club',
+        port: process.env.BOT_PORT ? parseInt(process.env.BOT_PORT) : 23028,
+        version: process.env.BOT_VERSION || '1.18.2',
         autoReconnect: true
     };
-    
+
     const bot = createBot(defaultConfig);
     bots.set('default', bot);
     botConfigs.push(defaultConfig);
     activeBots++;
 }, 1000);
+
+// Tambahkan di dalam fungsi createBot, pada event bot.on("message", ...)
+bot.on("message", async (message) => {
+    const messageText = message.toString();
+
+    // Filter pesan health/mana
+    const healthManaRegex = /^\[BOT-[^\]]+\] \[\d{1,2}:\d{2}:\d{2} (AM|PM)\] \d+\/\d+❤ \d+\/\d+ Mana$/;
+    if (healthManaRegex.test(messageText)) {
+        // Jangan log dan jangan broadcast ke web
+        return;
+    }
+
+    console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
+    
+    // Chat trigger actions
+    if (messageText.includes("bone_reload")) {
+        console.log(`[BOT-${botId}] Detected bone_reload command`);
+        bot.chat("/r baik bot akan segera melakukan home bonemeal dan auto");
+        setTimeout(async () => {
+            bot.chat("/home bonemeal");
+            console.log(`[BOT-${botId}] Executed /home bonemeal`);
+            setTimeout(async () => {
+                await executeAutoShop(bot);
+            }, 2000);
+        }, 1000);
+    }
+    
+    // Deteksi pesan pembelian shop dan tutup chest jika terbuka
+    if (
+        messageText.includes("Shop > You bought") &&
+        bot.currentWindow
+    ) {
+        bot.closeWindow(bot.currentWindow);
+        console.log(`[BOT-${botId}] Chest otomatis ditutup setelah pembelian.`);
+    }
+
+    // Deteksi inventory penuh dari pesan server
+    if (messageText.includes("Shop > You don't have enough free space in your inventory.")) {
+        console.log(`[BOT-${botId}] Deteksi inventory penuh dari pesan server, drop semua item...`);
+        await autoDropAll(bot);
+    }
+
+    // Update online players list for this bot
+    if (messageText.includes("memasuki permainan") || messageText.includes("joined the game")) {
+        updateOnlinePlayers(botId);
+    }
+    
+    // Broadcast message to web clients
+    io.emit('chatMessage', {
+        botId: botId,
+        username: config.username,
+        timestamp: new Date().toISOString(),
+        message: messageText
+    });
+
+    // Tambahan: Deteksi teleportasi ke hub dan auto /login + /survival
+    if (messageText.includes("[Sistem] Sedang mencoba teleportasi ke hub..")) {
+        console.log(`[BOT-${botId}] Detected teleport to hub, will try to /login and /survival`);
+        let attempts = 0;
+        const maxAttempts = 10;
+        let success = false;
+
+        while (attempts < maxAttempts && !success) {
+            try {
+                bot.chat(`/login ${config.password}`);
+                await delay(2000);
+                bot.chat("/survival");
+                console.log(`[BOT-${botId}] Attempted /login and /survival (attempt ${attempts + 1})`);
+
+                // Tunggu pesan join survival atau gagal
+                success = await waitForSurvivalJoin(bot, 60000); // 1 menit
+                if (success) {
+                    console.log(`[BOT-${botId}] Berhasil masuk survival`);
+                    break;
+                } else {
+                    console.log(`[BOT-${botId}] Gagal masuk survival, mencoba lagi...`);
+                }
+            } catch (err) {
+                console.log(`[BOT-${botId}] Error saat mencoba masuk survival:`, err.message);
+            }
+            attempts++;
+            if (!success && attempts < maxAttempts) {
+                await delay(60000); // Jeda 1 menit sebelum mencoba lagi
+            }
+        }
+        if (!success) {
+            console.log(`[BOT-${botId}] Gagal masuk survival setelah ${maxAttempts} percobaan.`);
+        }
+    }
+});
+
+// Helper function untuk menunggu pesan join survival atau gagal
+async function waitForSurvivalJoin(bot, timeout = 60000) {
+    return new Promise((resolve) => {
+        let resolved = false;
+        const joinSurvivalKeywords = [
+            "Selamat datang di dunia survival",
+            "Welcome to survival",
+            "Anda telah masuk ke dunia survival",
+            "You have joined survival"
+        ];
+        const failKeywords = [
+            "Gagal masuk ke survival",
+            "Failed to join survival",
+            "Anda belum login",
+            "You are not logged in"
+        ];
+
+        function onMessage(msg) {
+            const text = msg.toString();
+            if (joinSurvivalKeywords.some(k => text.includes(k))) {
+                cleanup();
+                resolve(true);
+            }
+            if (failKeywords.some(k => text.includes(k))) {
+                cleanup();
+                resolve(false);
+            }
+        }
+        function cleanup() {
+            if (!resolved) {
+                resolved = true;
+                bot.removeListener('message', onMessage);
+            }
+        }
+        bot.on('message', onMessage);
+        setTimeout(() => {
+            cleanup();
+            resolve(false);
+        }, timeout);
+    });
+}

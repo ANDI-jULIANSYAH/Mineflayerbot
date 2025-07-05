@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,39 +21,6 @@
             <button id="add-bot-btn" class="btn btn-primary">Add New Bot</button>
             <button id="remove-all-btn" class="btn btn-danger">Remove All Bots</button>
             <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
-            <button id="tpa-all-btn" class="btn btn-warning">TPA All to ItzAndyka09</button>
-        </div>
-
-        <!-- Mining Controls -->
-        <div class="mining-controls">
-            <h3>Mining Controls</h3>
-            <div class="mining-form">
-                <select id="mining-target">
-                    <option value="all">All Bots</option>
-                </select>
-                <select id="area-select">
-                    <option value="">Select Mining Area</option>
-                </select>
-                <button id="start-mining-btn" class="btn btn-success">Start Mining</button>
-                <button id="stop-mining-btn" class="btn btn-danger">Stop Mining</button>
-                <button id="add-area-btn" class="btn btn-secondary">Add New Area</button>
-            </div>
-
-            <!-- Custom Area Form -->
-            <div id="custom-area-form" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 5px;">
-                <h4>Add New Mining Area</h4>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
-                    <input type="text" id="area-name" placeholder="Area Name" style="grid-column: 1 / -1;">
-                    <input type="number" id="area-x1" placeholder="X1">
-                    <input type="number" id="area-y1" placeholder="Y1">
-                    <input type="number" id="area-z1" placeholder="Z1">
-                    <input type="number" id="area-x2" placeholder="X2">
-                    <input type="number" id="area-y2" placeholder="Y2">
-                    <input type="number" id="area-z2" placeholder="Z2">
-                </div>
-                <button id="save-area-btn" class="btn btn-primary">Save Area</button>
-                <button id="cancel-area-btn" class="btn btn-secondary">Cancel</button>
-            </div>
         </div>
 
         <!-- Add Bot Modal -->
@@ -63,29 +31,24 @@
                 <form id="bot-form">
                     <label for="bot-username">Username:</label>
                     <input type="text" id="bot-username" required>
-
+                    
                     <label for="bot-password">Password (optional):</label>
                     <input type="text" id="bot-password">
-
+                    
                     <label for="bot-host">Host:</label>
                     <input type="text" id="bot-host" value="localmc.club">
-
+                    
                     <label for="bot-port">Port:</label>
                     <input type="number" id="bot-port" value="23028">
-
+                    
                     <label for="bot-version">Version:</label>
                     <input type="text" id="bot-version" value="1.18.2">
-
+                    
                     <label>
                         <input type="checkbox" id="bot-auto-reconnect" checked>
                         Auto Reconnect
                     </label>
-
-                    <label>
-                        <input type="checkbox" id="bot-use-proxy" id="bot-use-proxy" checked>
-                        Use Proxy (Different IP)
-                    </label>
-
+                    
                     <button type="submit" class="btn btn-primary">Create Bot</button>
                 </form>
             </div>

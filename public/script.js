@@ -22,6 +22,13 @@ const botProxySelect = document.getElementById('bot-proxy');
 document.addEventListener('DOMContentLoaded', () => {
     loadProxies();
     initializeEventListeners();
+    initializeStatsSection();
+    loadStats('weekly'); // Load weekly stats by default
+    
+    // Force refresh all stats every 30 seconds
+    setInterval(() => {
+        refreshAllStats();
+    }, 30000);
 });
 
 function initializeEventListeners() {
@@ -107,14 +114,45 @@ function refreshStats() {
         .catch(error => console.error('Failed to refresh stats:', error));
 }
 
+function refreshAllStats() {
+    // Refresh bot stats
+    refreshStats();
+    
+    // Refresh player statistics
+    const activePlaytimeTab = document.querySelector('.playtime-stats .tab-btn.active');
+    if (activePlaytimeTab) {
+        loadStats(activePlaytimeTab.dataset.tab);
+    }
+    
+    // Refresh profanity statistics
+    const activeProfanityTab = document.querySelector('.profanity-stats .tab-btn.active');
+    if (activeProfanityTab) {
+        loadProfanityStats(activeProfanityTab.dataset.tab);
+    }
+    
+    // Refresh chat statistics
+    const activeChatTab = document.querySelector('.chat-stats .tab-btn.active');
+    if (activeChatTab) {
+        loadChatStats(activeChatTab.dataset.tab);
+    }
+}
+
 function sendChatMessage() {
     const message = chatInput.value.trim();
     const target = chatTarget.value;
     
     if (!message) return;
 
-    // Send message via socket or handle locally
-    addToConsole(`[CHAT] To ${target}: ${message}`, 'chat');
+    if (target === 'all') {
+        // Send to all bots
+        socket.emit('sendChatToAll', message);
+        addToConsole(`[CHAT] To All Bots: ${message}`, 'chat');
+    } else {
+        // Send to specific bot
+        socket.emit('sendChatToBot', { botId: target, message: message });
+        addToConsole(`[CHAT] To Bot ${target}: ${message}`, 'chat');
+    }
+    
     chatInput.value = '';
 }
 
@@ -263,3 +301,401 @@ socket.on('error', (error) => {
     addToConsole(`Error: ${error}`, 'error');
     alert(`Error: ${error}`);
 });
+
+// Stats section functionality
+function initializeStatsSection() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Get parent stats section
+            const statsSection = btn.closest('.stats-section');
+            const siblingTabs = statsSection.querySelectorAll('.tab-btn');
+            
+            // Remove active class from sibling tabs only
+            siblingTabs.forEach(tab => tab.classList.remove('active'));
+            // Add active class to clicked tab
+            btn.classList.add('active');
+            
+            // Load corresponding stats
+            const tabType = btn.dataset.tab;
+            if (tabType.startsWith('profanity-')) {
+                loadProfanityStats(tabType);
+            } else if (tabType.startsWith('top-chatters') || tabType.startsWith('player-chat')) {
+                loadChatStats(tabType);
+            } else {
+                loadStats(tabType);
+            }
+        });
+    });
+    
+    // Initialize stats
+    loadProfanityStats('profanity-weekly');
+    loadChatStats('top-chatters');
+    
+    // Initialize player search
+    const searchBtn = document.getElementById('search-player-btn');
+    const playerInput = document.getElementById('player-name-input');
+    
+    if (searchBtn && playerInput) {
+        searchBtn.addEventListener('click', () => {
+            const playerName = playerInput.value.trim();
+            if (playerName) {
+                loadPlayerChatHistory(playerName);
+            }
+        });
+        
+        playerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const playerName = playerInput.value.trim();
+                if (playerName) {
+                    loadPlayerChatHistory(playerName);
+                }
+            }
+        });
+    }
+}
+
+async function loadStats(type) {
+    const statsContent = document.getElementById('stats-content');
+    statsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">Loading...</div>';
+
+    try {
+        let endpoint;
+        switch (type) {
+            case 'weekly':
+                endpoint = '/api/stats/weekly';
+                break;
+            case 'monthly':
+                endpoint = '/api/stats/monthly';
+                break;
+            case 'top':
+                endpoint = '/api/stats/top-players';
+                break;
+        }
+
+        const response = await fetch(endpoint);
+        const stats = await response.json();
+        displayStats(stats, type);
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+        statsContent.innerHTML = '<div style="text-align: center; color: #e74c3c;">Failed to load statistics</div>';
+    }
+}
+
+function displayStats(stats, type) {
+    const statsContent = document.getElementById('stats-content');
+    
+    if (!stats || stats.length === 0) {
+        statsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">No data available</div>';
+        return;
+    }
+
+    const tableHeaders = type === 'top' ? 
+        ['Player', 'Total Playtime', 'Sessions', 'Days Played', 'Last Played'] :
+        ['Player', 'Playtime', 'Sessions', 'Days Played'];
+
+    let tableHTML = `
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    stats.forEach((player, index) => {
+        const playtimeHours = Math.floor(player.total_minutes / 60);
+        const playtimeMinutes = player.total_minutes % 60;
+        const playtimeDisplay = `${playtimeHours}h ${playtimeMinutes}m`;
+        
+        const lastPlayedDisplay = player.last_played ? 
+            new Date(player.last_played).toLocaleDateString() : '';
+
+        tableHTML += `
+            <tr>
+                <td>${player.player_name}</td>
+                <td><span class="playtime-badge">${playtimeDisplay}</span></td>
+                <td>${player.total_sessions}</td>
+                <td>${player.days_played}</td>
+                ${type === 'top' ? `<td>${lastPlayedDisplay}</td>` : ''}
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    statsContent.innerHTML = tableHTML;
+}
+
+// Load profanity statistics
+async function loadProfanityStats(type) {
+    const profanityStatsContent = document.getElementById('profanity-stats-content');
+    profanityStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">Loading...</div>';
+
+    try {
+        let endpoint;
+        switch (type) {
+            case 'profanity-weekly':
+                endpoint = '/api/stats/profanity/weekly';
+                break;
+            case 'profanity-monthly':
+                endpoint = '/api/stats/profanity/monthly';
+                break;
+            case 'profanity-users':
+                endpoint = '/api/stats/profanity/top-users';
+                break;
+            case 'profanity-words':
+                endpoint = '/api/stats/profanity/top-words';
+                break;
+        }
+
+        const response = await fetch(endpoint);
+        const stats = await response.json();
+        displayProfanityStats(stats, type);
+    } catch (error) {
+        console.error('Failed to load profanity stats:', error);
+        profanityStatsContent.innerHTML = '<div style="text-align: center; color: #e74c3c;">Failed to load profanity statistics</div>';
+    }
+}
+
+function displayProfanityStats(stats, type) {
+    const profanityStatsContent = document.getElementById('profanity-stats-content');
+    
+    if (!stats || stats.length === 0) {
+        profanityStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">No profanity data available</div>';
+        return;
+    }
+
+    let tableHTML = '';
+
+    if (type === 'profanity-users') {
+        tableHTML = `
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Total Usage</th>
+                        <th>Unique Words</th>
+                        <th>Last Used</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        stats.forEach(player => {
+            const lastUsed = player.last_used ? 
+                new Date(player.last_used).toLocaleDateString() : '';
+
+            tableHTML += `
+                <tr>
+                    <td>${player.player_name}</td>
+                    <td><span class="profanity-badge">${player.total_profanity}</span></td>
+                    <td>${player.unique_words}</td>
+                    <td>${lastUsed}</td>
+                </tr>
+            `;
+        });
+    } else if (type === 'profanity-words') {
+        tableHTML = `
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Word</th>
+                        <th>Total Usage</th>
+                        <th>Users Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        stats.forEach(word => {
+            tableHTML += `
+                <tr>
+                    <td><span class="word-badge">${word.word}</span></td>
+                    <td><span class="profanity-badge">${word.total_usage}</span></td>
+                    <td>${word.users_count}</td>
+                </tr>
+            `;
+        });
+    } else {
+        // Weekly/Monthly view grouped by player
+        const groupedStats = {};
+        stats.forEach(stat => {
+            if (!groupedStats[stat.player_name]) {
+                groupedStats[stat.player_name] = [];
+            }
+            groupedStats[stat.player_name].push(stat);
+        });
+
+        tableHTML = `
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Words Used</th>
+                        <th>Total Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        Object.keys(groupedStats).forEach(playerName => {
+            const playerStats = groupedStats[playerName];
+            const totalCount = playerStats.reduce((sum, stat) => sum + stat.total_count, 0);
+            const wordsUsed = playerStats.map(stat => 
+                `<span class="word-badge">${stat.word} (${stat.total_count})</span>`
+            ).join(' ');
+
+            tableHTML += `
+                <tr>
+                    <td>${playerName}</td>
+                    <td>${wordsUsed}</td>
+                    <td><span class="profanity-badge">${totalCount}</span></td>
+                </tr>
+            `;
+        });
+    }
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    profanityStatsContent.innerHTML = tableHTML;
+}
+
+// Load chat statistics
+async function loadChatStats(type) {
+    const chatStatsContent = document.getElementById('chat-stats-content');
+    const playerSearch = document.getElementById('player-search');
+    
+    if (type === 'player-chat') {
+        playerSearch.style.display = 'block';
+        chatStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">Enter a player name to search chat history</div>';
+        return;
+    } else {
+        playerSearch.style.display = 'none';
+    }
+    
+    chatStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">Loading...</div>';
+
+    try {
+        let endpoint = '/api/stats/top-chatters';
+        const response = await fetch(endpoint);
+        const stats = await response.json();
+        displayChatStats(stats, type);
+    } catch (error) {
+        console.error('Failed to load chat stats:', error);
+        chatStatsContent.innerHTML = '<div style="text-align: center; color: #e74c3c;">Failed to load chat statistics</div>';
+    }
+}
+
+function displayChatStats(stats, type) {
+    const chatStatsContent = document.getElementById('chat-stats-content');
+    
+    if (!stats || stats.length === 0) {
+        chatStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">No chat data available</div>';
+        return;
+    }
+
+    let tableHTML = `
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    <th>Total Messages</th>
+                    <th>Days Active</th>
+                    <th>Last Active</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    stats.forEach(player => {
+        const lastActive = player.last_active ? 
+            new Date(player.last_active).toLocaleDateString() : '';
+
+        tableHTML += `
+            <tr>
+                <td>${player.player_name}</td>
+                <td><span class="chat-badge">${player.total_messages}</span></td>
+                <td>${player.days_active}</td>
+                <td>${lastActive}</td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    chatStatsContent.innerHTML = tableHTML;
+}
+
+async function loadPlayerChatHistory(playerName) {
+    const chatStatsContent = document.getElementById('chat-stats-content');
+    chatStatsContent.innerHTML = '<div style="text-align: center; color: #ecf0f1;">Loading...</div>';
+
+    try {
+        const response = await fetch(`/api/stats/player-chat/${encodeURIComponent(playerName)}`);
+        const stats = await response.json();
+        displayPlayerChatHistory(stats, playerName);
+    } catch (error) {
+        console.error('Failed to load player chat history:', error);
+        chatStatsContent.innerHTML = '<div style="text-align: center; color: #e74c3c;">Failed to load player chat history</div>';
+    }
+}
+
+function displayPlayerChatHistory(stats, playerName) {
+    const chatStatsContent = document.getElementById('chat-stats-content');
+    
+    if (!stats || stats.length === 0) {
+        chatStatsContent.innerHTML = `<div style="text-align: center; color: #ecf0f1;">No chat history found for ${playerName}</div>`;
+        return;
+    }
+
+    let tableHTML = `
+        <h4 style="color: #ecf0f1; margin-bottom: 15px;">Chat History for ${playerName}</h4>
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Messages Count</th>
+                    <th>Last Message</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    stats.forEach(record => {
+        const date = new Date(record.date).toLocaleDateString();
+        const lastMessage = record.last_message ? 
+            record.last_message.substring(0, 50) + (record.last_message.length > 50 ? '...' : '') : 
+            'No message';
+
+        tableHTML += `
+            <tr>
+                <td>${date}</td>
+                <td><span class="chat-badge">${record.message_count}</span></td>
+                <td title="${record.last_message || ''}">${lastMessage}</td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    chatStatsContent.innerHTML = tableHTML;
+}
+
+// Auto refresh stats every 5 minutes
+setInterval(() => {
+    refreshAllStats();
+}, 300000);

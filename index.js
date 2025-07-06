@@ -1,514 +1,265 @@
-// Cek dan install mineflayer otomatis jika belum ada
-try {
-    require.resolve('mineflayer');
-} catch (e) {
-    console.log('mineflayer belum terinstall. Menginstall...');
-    const { execSync } = require('child_process');
-    execSync('npm install mineflayer', { stdio: 'inherit' });
-    console.log('Install mineflayer selesai. Silakan jalankan ulang program.');
-    process.exit(0);
+
+const socket = io();
+
+let allBots = new Map();
+
+// DOM Elements
+const botsGrid = document.getElementById('bots-grid');
+const addBotBtn = document.getElementById('add-bot-btn');
+const removeAllBtn = document.getElementById('remove-all-btn');
+const refreshBtn = document.getElementById('refresh-btn');
+const addBotModal = document.getElementById('add-bot-modal');
+const botForm = document.getElementById('bot-form');
+const closeModal = document.querySelector('.close');
+const activeBotCount = document.getElementById('active-bots');
+const consoleOutput = document.getElementById('console-output');
+const chatInput = document.getElementById('chat-input');
+const chatTarget = document.getElementById('chat-target');
+const sendBtn = document.getElementById('send-btn');
+const botProxySelect = document.getElementById('bot-proxy');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadProxies();
+    initializeEventListeners();
+});
+
+function initializeEventListeners() {
+    addBotBtn.addEventListener('click', () => {
+        addBotModal.style.display = 'block';
+    });
+
+    closeModal.addEventListener('click', () => {
+        addBotModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === addBotModal) {
+            addBotModal.style.display = 'none';
+        }
+    });
+
+    botForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        createBot();
+    });
+
+    removeAllBtn.addEventListener('click', removeAllBots);
+    refreshBtn.addEventListener('click', refreshStats);
+
+    sendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
 }
 
-const mineflayer = require("mineflayer");
-const fs = require("fs");
-const path = require("path");
-const express = require('express')
-const http = require('http')
-const socketIo = require('socket.io')
-const app = express()
-const server = http.createServer(app)
-const io = socketIo(server)
-const PORT = process.env.PORT || 3000
-const SocksClient = require('socks5-client'); // Tambahkan ini
-
-// Daftar proxy SOCKS5
-const socks5ProxyList = [
-    { name: 'Proxy 1', host: '127.0.0.1', port: 1080 },
-    { name: 'Proxy 2', host: '199.102.104.70', port: 4145 },
-    { name: 'Proxy 3', host: '184.181.217.194' , port: 4145 },
-];
-
-// Multi-bot management
-let bots = new Map(); // Store all bot instances
-let botConfigs = []; // Store bot configurations
-let activeBots = 0;
-const maxBots = 50;
-
-// Proxy list - tambahkan proxy Anda di sini
-const proxyList = [
-    null, // No proxy for first bot
-    // Tambahkan proxy dalam format:
-    // { host: 'proxy-host', port: 'proxy-port', username: 'user', password: 'pass' }
-    // atau { host: 'proxy-host', port: 'proxy-port' } untuk proxy tanpa auth
-];
-
-// Bot stats for all bots
-let allBotStats = new Map();
-
-let startTime = null;
-let logBuffer = [];
-
-function ensureChangelogDir() {
-    const changelogDir = path.join(__dirname, "Changelog");
-    if (!fs.existsSync(changelogDir)) {
-        fs.mkdirSync(changelogDir, { recursive: true });
-    }
-    return changelogDir;
-}
-
-function formatDateTime(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}(${hours}:${minutes}:${seconds})`;
-}
-
-function saveChangelog() {
-    if (logBuffer.length === 0 || !startTime) return;
-    const changelogDir = ensureChangelogDir();
-    const endTime = new Date();
-    const filename = `${formatDateTime(startTime)} - ${formatDateTime(endTime)}.txt`;
-    const filepath = path.join(changelogDir, filename);
+async function loadProxies() {
     try {
-        fs.writeFileSync(filepath, logBuffer.join('\n'), 'utf8');
-        console.log(`Changelog saved: ${filename}`);
-        logBuffer = [];
-    } catch (err) {
-        console.log('Error saving changelog:', err);
+        const response = await fetch('/api/proxies');
+        const proxies = await response.json();
+        
+        botProxySelect.innerHTML = '<option value="">Direct</option>';
+        proxies.forEach(proxy => {
+            const option = document.createElement('option');
+            option.value = proxy.index;
+            option.textContent = `${proxy.name} (${proxy.host}:${proxy.port})`;
+            botProxySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load proxies:', error);
     }
 }
 
-const originalConsoleLog = console.log;
-console.log = function(...args) {
-    const message = args.join(' ');
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] ${message}`;
-    originalConsoleLog(logEntry);
-    if (startTime) {
-        logBuffer.push(logEntry);
-    }
-};
-
-function getRandomProxy() {
-    if (proxyList.length <= 1) return null;
-    const randomIndex = Math.floor(Math.random() * (proxyList.length - 1)) + 1;
-    return proxyList[randomIndex];
-}
-
-function createBot(config) {
-    const botId = config.id;
-    let proxy = null;
-
-    // Pilih proxy jika ada
-    if (config.proxyType === 'socks5' && config.proxyIndex !== undefined) {
-        proxy = socks5ProxyList[config.proxyIndex];
-    }
-
-    const botOptions = {
-        host: config.host || "localmc.club",
-        port: config.port || 23028,
-        username: config.username,
-        version: config.version || "1.18.2",
-        viewDistance: 12
+function createBot() {
+    const formData = new FormData(botForm);
+    const config = {
+        username: formData.get('bot-username') || document.getElementById('bot-username').value,
+        password: formData.get('bot-password') || document.getElementById('bot-password').value,
+        host: formData.get('bot-host') || document.getElementById('bot-host').value,
+        port: parseInt(formData.get('bot-port') || document.getElementById('bot-port').value),
+        version: formData.get('bot-version') || document.getElementById('bot-version').value,
+        autoReconnect: document.getElementById('bot-auto-reconnect').checked,
+        proxyType: 'socks5',
+        proxyIndex: botProxySelect.value ? parseInt(botProxySelect.value) : undefined
     };
 
-    // SOCKS5 Proxy support
-    if (proxy) {
-        botOptions.connect = (client) => {
-            const net = require('net');
-            const socks = require('socks5-client');
-            const socket = new socks.Socks5ClientSocket(proxy.host, proxy.port);
-            socket.on('error', (err) => {
-                console.log(`[BOT-${botId}] SOCKS5 Proxy error:`, err.message);
-            });
-            return socket;
-        };
-        console.log(`[BOT-${botId}] Using SOCKS5 proxy: ${proxy.host}:${proxy.port}`);
-    }
-
-    // Add proxy if available
-    if (proxy) {
-        botOptions.connect = (client) => {
-            const net = require('net');
-            const socket = net.connect(proxy.port, proxy.host);
-            
-            if (proxy.username && proxy.password) {
-                // Proxy with authentication
-                socket.write(`CONNECT ${botOptions.host}:${botOptions.port} HTTP/1.1\r\n`);
-                socket.write(`Proxy-Authorization: Basic ${Buffer.from(`${proxy.username}:${proxy.password}`).toString('base64')}\r\n`);
-                socket.write('\r\n');
-            } else {
-                // Proxy without authentication
-                socket.write(`CONNECT ${botOptions.host}:${botOptions.port} HTTP/1.1\r\n\r\n`);
-            }
-            
-            return socket;
-        };
-        console.log(`[BOT-${botId}] Using proxy: ${proxy.host}:${proxy.port}`);
-    }
-
-    const bot = mineflayer.createBot(botOptions);
-
-    // Initialize bot stats
-    allBotStats.set(botId, {
-        id: botId,
-        username: config.username,
-        health: 0,
-        food: 0,
-        ping: 0,
-        status: 'Connecting',
-        onlinePlayers: [],
-        proxy: proxy ? `${proxy.host}:${proxy.port}` : 'Direct'
-    });
-
-    bot.botId = botId;
-    bot.config = config;
-
-    bot.on("login", () => {
-        if (!startTime) {
-            startTime = new Date();
-            logBuffer = [];
-        }
-        console.log(`[BOT-${botId}] Berhasil Login`);
-        const stats = allBotStats.get(botId);
-        stats.status = 'Online';
-        allBotStats.set(botId, stats);
-        broadcastStats();
-    });
-
-    bot.on("spawn", () => {
-        console.log(`[BOT-${botId}] spawned in`);
-        bot.chat(config.password ? `/login ${config.password}` : "/login MASTER09");
-        setTimeout(() => {
-            bot.chat("/survival");
-            console.log(`[BOT-${botId}] Auto /survival on spawn`);
-        }, 2000);
-        
-        // Start periodic stats update for this bot
-        setInterval(() => {
-            updateBotStats(botId);
-        }, 5000);
-    });
-
-    bot.on("message", async (message) => {
-        const messageText = message.toString();
-
-        // Filter pesan health/mana agar tidak tampil di console & web
-        if (/^\s*\d+\/\d+❤\s+\d+\/\d+\s*Mana\s*$/i.test(messageText)) return;
-
-        console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
-        
-        // Update online players list for this bot
-        if (messageText.includes("memasuki permainan") || messageText.includes("joined the game")) {
-            updateOnlinePlayers(botId);
-        }
-        
-        // Broadcast message to web clients
-        io.emit('chatMessage', {
-            botId: botId,
-            username: config.username,
-            timestamp: new Date().toISOString(),
-            message: messageText
-        });
-    });
-
-    bot.on("end", (reason) => {
-        console.log(`[BOT-${botId}] Disconnected. Reason:`, reason);
-        const stats = allBotStats.get(botId);
-        stats.status = 'Disconnected';
-        allBotStats.set(botId, stats);
-        broadcastStats();
-        
-        // Auto reconnect if enabled
-        if (config.autoReconnect) {
-            setTimeout(() => {
-                console.log(`[BOT-${botId}] Attempting to reconnect...`);
-                const newBot = createBot(config);
-                bots.set(botId, newBot);
-            }, 5000);
-        }
-    });
-
-    bot.on("kicked", (reason) => {
-        console.log(`[BOT-${botId}] Kicked:`, reason);
-        const stats = allBotStats.get(botId);
-        stats.status = 'Kicked';
-        allBotStats.set(botId, stats);
-        broadcastStats();
-    });
-
-    bot.on("error", (err) => {
-        console.log(`[BOT-${botId}] Error:`, err);
-        const stats = allBotStats.get(botId);
-        stats.status = 'Error';
-        allBotStats.set(botId, stats);
-        broadcastStats();
-    });
-
-    // Tambahkan penjadwalan survival jam 01.00
-    bot.once('login', () => {
-        scheduleSurvivalAt1AM(bot);
-    });
-
-    // Handler untuk kick "Server is Restarting"
-    bot.on("kicked", (reason) => {
-        console.log(`[BOT-${botId}] Kicked:`, reason);
-        const stats = allBotStats.get(botId);
-        stats.status = 'Kicked';
-        allBotStats.set(botId, stats);
-        broadcastStats();
-
-        // Deteksi pesan restart
-        if (typeof reason === 'string' && reason.includes('Server is Restarting')) {
-            setTimeout(() => {
-                autoJoinSurvival(bot);
-            }, 5000);
-        }
-    });
-
-    // Handler jika join survival gagal (deteksi pesan join survival)
-    bot.on("message", async (message) => {
-        const messageText = message.toString();
-        // ...existing code...
-
-        // Deteksi gagal join survival
-        if (
-            messageText.includes("You are not logged in") ||
-            messageText.includes("You must login") ||
-            messageText.includes("You are not in survival") ||
-            messageText.includes("failed to join survival")
-        ) {
-            console.log(`[BOT-${bot.botId}] Deteksi gagal join survival, mencoba ulang...`);
-            autoJoinSurvival(bot);
-        }
-
-        // ...existing code...
-    });
-
-    return bot;
+    socket.emit('createBot', config);
+    addBotModal.style.display = 'none';
+    botForm.reset();
 }
 
-// Simpan changelog setiap 5 menit
-setInterval(saveChangelog, 300000);
+function removeAllBots() {
+    if (confirm('Are you sure you want to remove all bots?')) {
+        allBots.forEach((bot, botId) => {
+            socket.emit('removeBot', botId);
+        });
+    }
+}
 
-process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT. Saving changelog...');
-    saveChangelog();
-    process.exit(0);
-});
-process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM. Saving changelog...');
-    saveChangelog();
-    process.exit(0);
-});
+function refreshStats() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(stats => {
+            socket.emit('allStatsUpdate', stats);
+        })
+        .catch(error => console.error('Failed to refresh stats:', error));
+}
 
-// Fitur chat dari console
-const readline = require('readline');
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    const target = chatTarget.value;
+    
+    if (!message) return;
 
-rl.on('line', async (input) => {
-    const args = input.split(' ');
-    if (args[0].startsWith('@')) {
-        const botId = args[0].substring(1);
-        const message = args.slice(1).join(' ');
-        const bot = bots.get(botId);
-        if (bot) {
-            bot.chat(message);
-            console.log(`[CONSOLE CHAT to BOT-${botId}] ${message}`);
-        } else {
-            console.log(`Bot ${botId} tidak ditemukan.`);
-        }
+    // Send message via socket or handle locally
+    addToConsole(`[CHAT] To ${target}: ${message}`, 'chat');
+    chatInput.value = '';
+}
+
+function addToConsole(message, type = 'system') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `console-message ${type}`;
+    messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    
+    consoleOutput.appendChild(messageDiv);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+    // Keep only last 1000 messages
+    while (consoleOutput.children.length > 1000) {
+        consoleOutput.removeChild(consoleOutput.firstChild);
+    }
+}
+
+function createBotCard(bot) {
+    const card = document.createElement('div');
+    card.className = 'bot-card';
+    card.id = `bot-${bot.id}`;
+
+    card.innerHTML = `
+        <div class="bot-header">
+            <h3>${bot.username}</h3>
+            <div class="bot-status status-${bot.status.toLowerCase()}">${bot.status}</div>
+            <button class="remove-bot-btn" onclick="removeBot('${bot.id}')">&times;</button>
+        </div>
+        
+        <div class="bot-stats">
+            <div class="stat">
+                <label>Health:</label>
+                <div class="progress-bar">
+                    <div class="progress-fill health" style="width: ${(bot.health / 20) * 100}%"></div>
+                </div>
+                <span>${bot.health}/20</span>
+            </div>
+            
+            <div class="stat">
+                <label>Food:</label>
+                <div class="progress-bar">
+                    <div class="progress-fill food" style="width: ${(bot.food / 20) * 100}%"></div>
+                </div>
+                <span>${bot.food}/20</span>
+            </div>
+            
+            <div class="stat">
+                <label>Ping:</label>
+                <span>${bot.ping}ms</span>
+            </div>
+            
+            <div class="stat">
+                <label>Proxy:</label>
+                <span>${bot.proxy}</span>
+            </div>
+        </div>
+        
+        <div class="bot-actions">
+            <button class="btn btn-small btn-secondary" onclick="sendBotCommand('${bot.id}', '/survival')">Survival</button>
+            <button class="btn btn-small btn-secondary" onclick="sendBotCommand('${bot.id}', '/spawn')">Spawn</button>
+        </div>
+        
+        <div class="bot-players">
+            <label>Online Players (${bot.onlinePlayers ? Object.keys(bot.onlinePlayers).length : 0}):</label>
+            <div class="players-list">
+                ${bot.onlinePlayers ? Object.keys(bot.onlinePlayers).map(player => 
+                    `<span class="player">${player}</span>`
+                ).join('') : ''}
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
+function updateBotCard(bot) {
+    const existingCard = document.getElementById(`bot-${bot.id}`);
+    if (existingCard) {
+        const newCard = createBotCard(bot);
+        existingCard.replaceWith(newCard);
     } else {
-        for (const [id, bot] of bots) {
-            bot.chat(input);
-        }
-        console.log(`[CONSOLE CHAT to ALL] ${input}`);
+        botsGrid.appendChild(createBotCard(bot));
     }
-});
-
-function waitWindowOpen(bot, timeout = 5000) {
-    return new Promise((resolve, reject) => {
-        let timer = setTimeout(() => {
-            bot.removeListener('windowOpen', onOpen);
-            reject(new Error('Timeout menunggu window terbuka'));
-        }, timeout);
-        function onOpen(window) {
-            clearTimeout(timer);
-            resolve(window);
-        }
-        bot.once('windowOpen', onOpen);
-    });
+    
+    // Update chat target dropdown
+    updateChatTargets();
 }
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Serve static files
-app.use(express.static('public'))
-
-// API endpoints
-app.get('/api/stats', (req, res) => {
-    const statsArray = Array.from(allBotStats.values());
-    res.json(statsArray);
-});
-
-app.get('/api/bots', (req, res) => {
-    const botsInfo = Array.from(bots.entries()).map(([id, bot]) => ({
-        id: id,
-        username: bot.config.username,
-        status: allBotStats.get(id)?.status || 'Unknown'
-    }));
-    res.json(botsInfo);
-});
-
-app.get('/api/proxies', (req, res) => {
-    res.json(socks5ProxyList.map((p, i) => ({ index: i, name: p.name, host: p.host, port: p.port })));
-});
-
-// Socket.io connection
-io.on('connection', (socket) => {
-    console.log('Client connected to web interface');
+function updateChatTargets() {
+    const currentValue = chatTarget.value;
+    chatTarget.innerHTML = '<option value="all">All Bots</option>';
     
-    // Send current stats to new client
-    socket.emit('allStatsUpdate', Array.from(allBotStats.values()));
-    
-    // Handle bot creation from web
-    socket.on('createBot', (config) => {
-        if (bots.size >= maxBots) {
-            socket.emit('error', 'Maximum bot limit reached');
-            return;
-        }
-        
-        const botId = Date.now().toString();
-        config.id = botId;
-        config.autoReconnect = config.autoReconnect || false;
-        
-        const bot = createBot(config);
-        bots.set(botId, bot);
-        botConfigs.push(config);
-        activeBots++;
-        
-        socket.emit('botCreated', { id: botId, config: config });
-        broadcastStats();
+    allBots.forEach((bot, botId) => {
+        const option = document.createElement('option');
+        option.value = botId;
+        option.textContent = `Bot ${bot.username}`;
+        chatTarget.appendChild(option);
     });
     
-    // Handle bot removal
-    socket.on('removeBot', (botId) => {
-        const bot = bots.get(botId);
-        if (bot) {
-            bot.quit();
-            bots.delete(botId);
-            botConfigs = botConfigs.filter(config => config.id !== botId);
-            activeBots--;
-            console.log(`Bot ${botId} removed`);
-            broadcastStats();
-        } else {
-            socket.emit('error', 'Bot not found');
-        }
-    });
+    if (chatTarget.querySelector(`option[value="${currentValue}"]`)) {
+        chatTarget.value = currentValue;
+    }
+}
+
+function removeBot(botId) {
+    if (confirm(`Are you sure you want to remove bot ${botId}?`)) {
+        socket.emit('removeBot', botId);
+    }
+}
+
+function sendBotCommand(botId, command) {
+    addToConsole(`Sending command to bot ${botId}: ${command}`, 'chat');
+    // You can emit a socket event here to send commands to specific bots
+}
+
+// Socket event listeners
+socket.on('connect', () => {
+    addToConsole('Connected to server', 'system');
 });
 
-// Broadcast stats to all connected web clients
-function broadcastStats() {
-    io.emit('allStatsUpdate', Array.from(allBotStats.values()));
-}
-
-// Update bot stats
-function updateBotStats(botId) {
-    const bot = bots.get(botId);
-    if (bot) {
-        const stats = allBotStats.get(botId);
-        if (stats) {
-            stats.health = bot.health;
-            stats.food = bot.food;
-            stats.ping = bot.ping;
-            stats.onlinePlayers = bot.players;
-            allBotStats.set(botId, stats);
-        }
-    }
-}
-
-// Auto join survival mode
-function autoJoinSurvival(bot) {
-    console.log(`[BOT-${bot.botId}] Mencoba untuk bergabung ke survival...`);
-    bot.chat("/survival");
-}
-
-// Schedule survival mode at 1 AM
-function scheduleSurvivalAt1AM(bot) {
-    const now = new Date();
-    const millisTill1AM = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 1 ? 1 : 0), 1, 0, 0, 0) - now;
-    setTimeout(() => {
-        console.log(`[BOT-${bot.botId}] Bergabung ke survival mode secara otomatis jam 01:00`);
-        autoJoinSurvival(bot);
-        
-        // Jadwalkan ulang untuk hari berikutnya
-        scheduleSurvivalAt1AM(bot);
-    }, millisTill1AM);
-}
-
-// Update daftar pemain online
-function updateOnlinePlayers(botId) {
-    const bot = bots.get(botId);
-    if (bot) {
-        const message = bot.players;
-        const stats = allBotStats.get(botId);
-        if (stats) {
-            stats.onlinePlayers = message;
-            allBotStats.set(botId, stats);
-        }
-    }
-}
-
-// Uji coba koneksi ke server Minecraft
-async function testConnection(config) {
-    return new Promise((resolve, reject) => {
-        const bot = mineflayer.createBot({
-            host: config.host,
-            port: config.port,
-            username: config.username,
-            version: config.version || "1.18.2",
-            auth: config.auth || 'mojang',
-            // Jangan tambahkan proxy di sini
-        });
-
-        bot.once('spawn', () => {
-            bot.quit();
-            resolve(true);
-        });
-
-        bot.on('error', (err) => {
-            bot.quit();
-            reject(err);
-        });
-
-        bot.on('kicked', (reason) => {
-            bot.quit();
-            reject(new Error(`Kicked: ${reason}`));
-        });
-    });
-}
-
-// Endpoint untuk menguji koneksi
-app.post('/api/test-connection', express.json(), async (req, res) => {
-    const config = req.body;
-    try {
-        // Uji coba koneksi tanpa menambahkan proxy
-        await testConnection(config);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
+socket.on('disconnect', () => {
+    addToConsole('Disconnected from server', 'error');
 });
 
-// Jalankan server
-server.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
+socket.on('allStatsUpdate', (stats) => {
+    allBots.clear();
+    botsGrid.innerHTML = '';
+    
+    stats.forEach(bot => {
+        allBots.set(bot.id, bot);
+        updateBotCard(bot);
+    });
+    
+    activeBotCount.textContent = stats.length;
+});
+
+socket.on('botCreated', (data) => {
+    addToConsole(`Bot created: ${data.config.username}`, 'system');
+});
+
+socket.on('chatMessage', (data) => {
+    addToConsole(`[BOT-${data.botId}] ${data.message}`, 'chat');
+});
+
+socket.on('error', (error) => {
+    addToConsole(`Error: ${error}`, 'error');
+    alert(`Error: ${error}`);
 });

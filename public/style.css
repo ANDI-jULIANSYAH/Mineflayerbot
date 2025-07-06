@@ -229,6 +229,83 @@ h1 {
     font-size: 0.8em;
 }
 
+.stats-section {
+    margin-bottom: 30px;
+}
+
+.playtime-stats {
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.playtime-stats h3 {
+    color: #ecf0f1;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+}
+
+.stats-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    background-color: #34495e;
+    color: #ecf0f1;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.tab-btn:hover {
+    background-color: #3498db;
+}
+
+.tab-btn.active {
+    background-color: #3498db;
+}
+
+.stats-content {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #ecf0f1;
+}
+
+.stats-table th,
+.stats-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+}
+
+.stats-table th {
+    background-color: #34495e;
+    font-weight: bold;
+}
+
+.stats-table tr:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+.playtime-badge {
+    background-color: #27ae60;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8em;
+}
+
 .global-chat {
     background: linear-gradient(135deg, #2c3e50, #34495e);
     border-radius: 10px;
@@ -375,32 +452,102 @@ h1 {
     .container {
         padding: 10px;
     }
-    
+
     header {
         flex-direction: column;
         gap: 10px;
         text-align: center;
     }
-    
+
     h1 {
         font-size: 2em;
     }
-    
+
     .bots-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .controls {
         flex-wrap: wrap;
     }
-    
+
     .chat-input-container {
         flex-direction: column;
     }
-    
+
     #chat-target {
         width: 100%;
     }
+}
+
+/* Profanity stats styling */
+.profanity-stats {
+    background: #2c3e50;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.profanity-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.word-badge {
+    background: #8e44ad;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-family: monospace;
+}
+
+.stats-section .profanity-stats h3 {
+    color: #e74c3c;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e74c3c;
+    padding-bottom: 5px;
+}
+
+/* Chat stats styling */
+.chat-stats {
+    background: #2c3e50;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.chat-badge {
+    background: #27ae60;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.stats-section .chat-stats h3 {
+    color: #27ae60;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #27ae60;
+    padding-bottom: 5px;
+}
+
+#player-search input {
+    background-color: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 5px;
+    padding: 8px;
+}
+
+#player-search input:focus {
+    outline: none;
+    border-color: #27ae60;
 }
 
 /* Scrollbar styling */

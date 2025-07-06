@@ -12,6 +12,7 @@ const refreshBtn = document.getElementById('refresh-btn');
 const addBotModal = document.getElementById('add-bot-modal');
 const closeModal = document.querySelector('.close');
 const botForm = document.getElementById('bot-form');
+const proxySelectElement = document.getElementById('bot-proxy');
 
 let botsData = new Map();
 
@@ -73,7 +74,9 @@ botForm.addEventListener('submit', (e) => {
         host: document.getElementById('bot-host').value,
         port: parseInt(document.getElementById('bot-port').value),
         version: document.getElementById('bot-version').value,
-        autoReconnect: document.getElementById('bot-auto-reconnect').checked
+        autoReconnect: document.getElementById('bot-auto-reconnect').checked,
+        proxyType: proxySelectElement.value !== "" ? "socks5" : undefined,
+        proxyIndex: proxySelectElement.value !== "" ? parseInt(proxySelectElement.value) : undefined
     };
     
     socket.emit('createBot', config);
@@ -234,6 +237,18 @@ chatInputElement.addEventListener('keypress', (e) => {
 
 // Send button
 document.getElementById('send-btn').addEventListener('click', sendMessage);
+
+// Fetch proxy list
+fetch('/api/proxies')
+    .then(res => res.json())
+    .then(proxies => {
+        proxies.forEach(proxy => {
+            const opt = document.createElement('option');
+            opt.value = proxy.index;
+            opt.textContent = `${proxy.name} (${proxy.host}:${proxy.port})`;
+            proxySelectElement.appendChild(opt);
+        });
+    });
 
 // Initial data fetch
 fetch('/api/stats')

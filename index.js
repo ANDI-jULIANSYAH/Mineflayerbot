@@ -21,6 +21,10 @@ const io = socketIo(server)
 const PORT = process.env.PORT || 5000
 const SocksClient = require('socks5-client'); // Tambahkan ini
 
+// Configure Express middleware
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
 // Daftar proxy SOCKS5
 const socks5ProxyList = [
     { name: 'Proxy 1', host: '127.0.0.1', port: 1080 },
@@ -353,8 +357,14 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Serve static files
-app.use(express.static('public'))
+// Serve static files first
+app.use(express.static(path.join(__dirname, 'public')))
+
+// Set proper content type for JS files
+app.get('*.js', (req, res, next) => {
+    res.type('application/javascript');
+    next();
+});
 
 // API endpoints
 app.get('/api/stats', (req, res) => {

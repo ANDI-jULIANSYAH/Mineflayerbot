@@ -20,6 +20,25 @@ const server = http.createServer(app)
 const io = socketIo(server)
 const PORT = process.env.PORT || 5000
 const SocksClient = require('socks5-client'); // Tambahkan ini
+const { 
+    initializeDatabase, 
+    trackPlayerJoin, 
+    trackPlayerLeave,
+    updateRealTimePlaytime,
+    getRealTimeStats,
+    getWeeklyStats, 
+    getMonthlyStats, 
+    getTopPlayers,
+    trackProfanity,
+    getWeeklyProfanityStats,
+    getMonthlyProfanityStats,
+    getTopProfanityUsers,
+    getMostUsedProfanity,
+    trackChatMessage,
+    getTopChatters,
+    getPlayerChatHistory,
+    closeDatabase 
+} = require('./database');
 
 // Daftar proxy SOCKS5
 const socks5ProxyList = [
@@ -193,6 +212,7 @@ function createBot(config) {
         // Start periodic stats update for this bot
         setInterval(() => {
             updateBotStats(botId);
+            updateRealTimePlaytimeForOnlinePlayers(bot);
         }, 5000);
     });
 
@@ -204,8 +224,46 @@ function createBot(config) {
 
         console.log(`[BOT-${botId}] [MESSAGE]`, messageText);
 
-        // Update online players list for this bot
+        // Track profanity usage and chat messages dari chat server
+        // Format chat yang didukung: 
+        // - "PlayerName: message"
+        // - "[Rank] PlayerName: message" 
+        // - "Sepuh PlayerName: message"
+        const chatMatch = messageText.match(/^(?:\[.*?\]\s+)?(?:Sepuh\s+)?(\w+):\s*(.+)$/);
+        if (chatMatch) {
+            const playerName = chatMatch[1];
+            const chatMessage = chatMatch[2];
+            
+            // Pastikan ini bukan pesan sistem atau bot
+            if (!chatMessage.includes('memasuki permainan') && 
+                !chatMessage.includes('meninggalkan permainan') && 
+                !chatMessage.includes('joined the game') && 
+                !chatMessage.includes('left the game') &&
+                !playerName.toLowerCase().includes('server') &&
+                !playerName.toLowerCase().includes('bot')) {
+                
+                await trackProfanity(playerName, chatMessage);
+                await trackChatMessage(playerName, chatMessage);
+                console.log(`[DB] Chat tracked - ${playerName}: ${chatMessage}`);
+            }
+        }
+
+        // Track player join/leave for playtime
         if (messageText.includes("memasuki permainan") || messageText.includes("joined the game")) {
+            const playerMatch = messageText.match(/(\w+)\s+(memasuki permainan|joined the game)/);
+            if (playerMatch) {
+                const playerName = playerMatch[1].replace(/^\[.*?\]\s*/, '').replace(/Sepuh\s+/, '');
+                await trackPlayerJoin(playerName);
+            }
+            updateOnlinePlayers(botId);
+        }
+
+        if (messageText.includes("meninggalkan permainan") || messageText.includes("left the game")) {
+            const playerMatch = messageText.match(/(\w+)\s+(meninggalkan permainan|left the game)/);
+            if (playerMatch) {
+                const playerName = playerMatch[1].replace(/^\[.*?\]\s*/, '').replace(/Sepuh\s+/, '');
+                await trackPlayerLeave(playerName);
+            }
             updateOnlinePlayers(botId);
         }
 
@@ -297,14 +355,16 @@ function createBot(config) {
 // Simpan changelog setiap 5 menit
 setInterval(saveChangelog, 300000);
 
-process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT. Saving changelog...');
+process.on('SIGINT', async () => {
+    console.log('\nReceived SIGINT. Saving changelog and closing database...');
     saveChangelog();
+    await closeDatabase();
     process.exit(0);
 });
-process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM. Saving changelog...');
+process.on('SIGTERM', async () => {
+    console.log('\nReceived SIGTERM. Saving changelog and closing database...');
     saveChangelog();
+    await closeDatabase();
     process.exit(0);
 });
 
@@ -387,6 +447,96 @@ app.get('/api/proxies', (req, res) => {
     res.json(socks5ProxyList.map((p, i) => ({ index: i, name: p.name, host: p.host, port: p.port })));
 });
 
+// API endpoints untuk statistik playtime
+app.get('/api/stats/weekly', async (req, res) => {
+    try {
+        const stats = await getRealTimeStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get weekly stats' });
+    }
+});
+
+app.get('/api/stats/monthly', async (req, res) => {
+    try {
+        const stats = await getMonthlyStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get monthly stats' });
+    }
+});
+
+app.get('/api/stats/top-players', async (req, res) => {
+    try {
+        const limit = req.query.limit || 10;
+        const stats = await getTopPlayers(parseInt(limit));
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get top players' });
+    }
+});
+
+// API endpoints untuk statistik kata kasar
+app.get('/api/stats/profanity/weekly', async (req, res) => {
+    try {
+        const stats = await getWeeklyProfanityStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get weekly profanity stats' });
+    }
+});
+
+app.get('/api/stats/profanity/monthly', async (req, res) => {
+    try {
+        const stats = await getMonthlyProfanityStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get monthly profanity stats' });
+    }
+});
+
+app.get('/api/stats/profanity/top-users', async (req, res) => {
+    try {
+        const limit = req.query.limit || 10;
+        const stats = await getTopProfanityUsers(parseInt(limit));
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get top profanity users' });
+    }
+});
+
+app.get('/api/stats/profanity/top-words', async (req, res) => {
+    try {
+        const limit = req.query.limit || 10;
+        const stats = await getMostUsedProfanity(parseInt(limit));
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get most used profanity' });
+    }
+});
+
+// API endpoints untuk statistik chat
+app.get('/api/stats/top-chatters', async (req, res) => {
+    try {
+        const limit = req.query.limit || 10;
+        const stats = await getTopChatters(parseInt(limit));
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get top chatters' });
+    }
+});
+
+app.get('/api/stats/player-chat/:playerName', async (req, res) => {
+    try {
+        const playerName = req.params.playerName;
+        const limit = req.query.limit || 50;
+        const stats = await getPlayerChatHistory(playerName, parseInt(limit));
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get player chat history' });
+    }
+});
+
 // Socket.io connection
 io.on('connection', (socket) => {
     console.log('Client connected to web interface');
@@ -426,6 +576,28 @@ io.on('connection', (socket) => {
             broadcastStats();
         } else {
             socket.emit('error', 'Bot not found');
+        }
+    });
+
+    // Handle chat message to all bots
+    socket.on('sendChatToAll', (message) => {
+        console.log(`[WEB CHAT to ALL] ${message}`);
+        for (const [id, bot] of bots) {
+            if (bot && bot.chat) {
+                bot.chat(message);
+            }
+        }
+    });
+
+    // Handle chat message to specific bot
+    socket.on('sendChatToBot', (data) => {
+        const { botId, message } = data;
+        const bot = bots.get(botId);
+        if (bot && bot.chat) {
+            console.log(`[WEB CHAT to BOT-${botId}] ${message}`);
+            bot.chat(message);
+        } else {
+            socket.emit('error', `Bot ${botId} not found or not available`);
         }
     });
 });
@@ -472,12 +644,58 @@ function scheduleSurvivalAt1AM(bot) {
 // Update daftar pemain online
 function updateOnlinePlayers(botId) {
     const bot = bots.get(botId);
-    if (bot) {
-        const message = bot.players;
+    if (bot && bot.players) {
         const stats = allBotStats.get(botId);
         if (stats) {
-            stats.onlinePlayers = message;
+            // Convert players object to array of player names
+            const playerNames = Object.keys(bot.players).filter(name => name !== bot.username);
+            stats.onlinePlayers = playerNames.reduce((obj, name) => {
+                obj[name] = bot.players[name];
+                return obj;
+            }, {});
             allBotStats.set(botId, stats);
+            broadcastStats();
+        }
+    }
+}
+
+// Update real-time playtime untuk player yang sedang online
+async function updateRealTimePlaytimeForOnlinePlayers(bot) {
+    if (bot && bot.players) {
+        const currentTime = new Date();
+        const playerNames = Object.keys(bot.players).filter(name => name !== bot.username);
+        
+        for (const playerName of playerNames) {
+            // Hitung playtime real-time berdasarkan session yang sedang aktif
+            try {
+                // Cari session aktif player ini
+                const activeSession = await new Promise((resolve, reject) => {
+                    const db = require('sqlite3').verbose();
+                    const dbPath = require('path').join(__dirname, 'playtime.db');
+                    const database = new db.Database(dbPath);
+                    
+                    database.get(`SELECT join_time FROM player_sessions 
+                                 WHERE player_name = ? AND leave_time IS NULL 
+                                 ORDER BY join_time DESC LIMIT 1`, 
+                        [playerName], 
+                        (err, row) => {
+                            database.close();
+                            if (err) reject(err);
+                            else resolve(row);
+                        }
+                    );
+                });
+                
+                if (activeSession) {
+                    const joinTime = new Date(activeSession.join_time);
+                    const currentMinutes = Math.floor((currentTime - joinTime) / (1000 * 60));
+                    
+                    // Update real-time playtime untuk hari ini
+                    await updateRealTimePlaytime(playerName, currentMinutes);
+                }
+            } catch (error) {
+                console.error(`Error updating real-time playtime for ${playerName}:`, error);
+            }
         }
     }
 }
@@ -523,7 +741,17 @@ app.post('/api/test-connection', express.json(), async (req, res) => {
     }
 });
 
-// Jalankan server
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server berjalan di http://0.0.0.0:${PORT}`);
-});
+// Initialize database and start server
+async function startServer() {
+    try {
+        await initializeDatabase();
+        server.listen(PORT, '0.0.0.0', () => {
+            console.log(`Server berjalan di http://0.0.0.0:${PORT}`);
+        });
+    } catch (error) {
+        console.error('Failed to initialize database:', error);
+        process.exit(1);
+    }
+}
+
+startServer();

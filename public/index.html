@@ -65,6 +65,52 @@
             </div>
         </div>
 
+        <div class="stats-section">
+            <div class="playtime-stats">
+                <h3>Player Statistics</h3>
+                <div class="stats-tabs">
+                    <button class="tab-btn active" data-tab="weekly">Weekly</button>
+                    <button class="tab-btn" data-tab="monthly">Monthly</button>
+                    <button class="tab-btn" data-tab="top">Top Players</button>
+                </div>
+                <div id="stats-content" class="stats-content">
+                    <!-- Stats content will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <div class="profanity-stats">
+                <h3>Profanity Statistics</h3>
+                <div class="stats-tabs">
+                    <button class="tab-btn active" data-tab="profanity-weekly">Weekly</button>
+                    <button class="tab-btn" data-tab="profanity-monthly">Monthly</button>
+                    <button class="tab-btn" data-tab="profanity-users">Top Users</button>
+                    <button class="tab-btn" data-tab="profanity-words">Top Words</button>
+                </div>
+                <div id="profanity-stats-content" class="stats-content">
+                    <!-- Profanity stats content will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <div class="chat-stats">
+                <h3>Chat Statistics</h3>
+                <div class="stats-tabs">
+                    <button class="tab-btn active" data-tab="top-chatters">Top Chatters</button>
+                    <button class="tab-btn" data-tab="player-chat">Player Chat History</button>
+                </div>
+                <div id="chat-stats-content" class="stats-content">
+                    <!-- Chat stats content will be loaded here -->
+                </div>
+                <div id="player-search" style="display: none; margin-top: 15px;">
+                    <input type="text" id="player-name-input" placeholder="Enter player name (e.g., NayraVxy_)" style="width: 200px; padding: 5px; margin-right: 10px;">
+                    <button id="search-player-btn" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+        </div>
+
         <div class="global-chat">
             <h3>Global Chat</h3>
             <div id="console-output" class="console-output"></div>

@@ -1,83 +1,265 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Bot Minecraft Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Multi-Bot Minecraft Dashboard</h1>
-            <div class="server-info">
-                <span>Active Bots: <span id="active-bots">0</span>/50</span>
-            </div>
-        </header>
 
-        <div class="controls">
-            <button id="add-bot-btn" class="btn btn-primary">Add New Bot</button>
-            <button id="remove-all-btn" class="btn btn-danger">Remove All Bots</button>
-            <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+const socket = io();
+
+let allBots = new Map();
+
+// DOM Elements
+const botsGrid = document.getElementById('bots-grid');
+const addBotBtn = document.getElementById('add-bot-btn');
+const removeAllBtn = document.getElementById('remove-all-btn');
+const refreshBtn = document.getElementById('refresh-btn');
+const addBotModal = document.getElementById('add-bot-modal');
+const botForm = document.getElementById('bot-form');
+const closeModal = document.querySelector('.close');
+const activeBotCount = document.getElementById('active-bots');
+const consoleOutput = document.getElementById('console-output');
+const chatInput = document.getElementById('chat-input');
+const chatTarget = document.getElementById('chat-target');
+const sendBtn = document.getElementById('send-btn');
+const botProxySelect = document.getElementById('bot-proxy');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadProxies();
+    initializeEventListeners();
+});
+
+function initializeEventListeners() {
+    addBotBtn.addEventListener('click', () => {
+        addBotModal.style.display = 'block';
+    });
+
+    closeModal.addEventListener('click', () => {
+        addBotModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === addBotModal) {
+            addBotModal.style.display = 'none';
+        }
+    });
+
+    botForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        createBot();
+    });
+
+    removeAllBtn.addEventListener('click', removeAllBots);
+    refreshBtn.addEventListener('click', refreshStats);
+
+    sendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+}
+
+async function loadProxies() {
+    try {
+        const response = await fetch('/api/proxies');
+        const proxies = await response.json();
+        
+        botProxySelect.innerHTML = '<option value="">Direct</option>';
+        proxies.forEach(proxy => {
+            const option = document.createElement('option');
+            option.value = proxy.index;
+            option.textContent = `${proxy.name} (${proxy.host}:${proxy.port})`;
+            botProxySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load proxies:', error);
+    }
+}
+
+function createBot() {
+    const formData = new FormData(botForm);
+    const config = {
+        username: formData.get('bot-username') || document.getElementById('bot-username').value,
+        password: formData.get('bot-password') || document.getElementById('bot-password').value,
+        host: formData.get('bot-host') || document.getElementById('bot-host').value,
+        port: parseInt(formData.get('bot-port') || document.getElementById('bot-port').value),
+        version: formData.get('bot-version') || document.getElementById('bot-version').value,
+        autoReconnect: document.getElementById('bot-auto-reconnect').checked,
+        proxyType: 'socks5',
+        proxyIndex: botProxySelect.value ? parseInt(botProxySelect.value) : undefined
+    };
+
+    socket.emit('createBot', config);
+    addBotModal.style.display = 'none';
+    botForm.reset();
+}
+
+function removeAllBots() {
+    if (confirm('Are you sure you want to remove all bots?')) {
+        allBots.forEach((bot, botId) => {
+            socket.emit('removeBot', botId);
+        });
+    }
+}
+
+function refreshStats() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(stats => {
+            socket.emit('allStatsUpdate', stats);
+        })
+        .catch(error => console.error('Failed to refresh stats:', error));
+}
+
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    const target = chatTarget.value;
+    
+    if (!message) return;
+
+    // Send message via socket or handle locally
+    addToConsole(`[CHAT] To ${target}: ${message}`, 'chat');
+    chatInput.value = '';
+}
+
+function addToConsole(message, type = 'system') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `console-message ${type}`;
+    messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    
+    consoleOutput.appendChild(messageDiv);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+    // Keep only last 1000 messages
+    while (consoleOutput.children.length > 1000) {
+        consoleOutput.removeChild(consoleOutput.firstChild);
+    }
+}
+
+function createBotCard(bot) {
+    const card = document.createElement('div');
+    card.className = 'bot-card';
+    card.id = `bot-${bot.id}`;
+
+    card.innerHTML = `
+        <div class="bot-header">
+            <h3>${bot.username}</h3>
+            <div class="bot-status status-${bot.status.toLowerCase()}">${bot.status}</div>
+            <button class="remove-bot-btn" onclick="removeBot('${bot.id}')">&times;</button>
         </div>
-
-        <!-- Add Bot Modal -->
-        <div id="add-bot-modal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Add New Bot</h2>
-                <form id="bot-form">
-                    <label for="bot-username">Username:</label>
-                    <input type="text" id="bot-username" required>
-                    
-                    <label for="bot-password">Password (optional):</label>
-                    <input type="text" id="bot-password">
-                    
-                    <label for="bot-host">Host:</label>
-                    <input type="text" id="bot-host" value="localmc.club">
-                    
-                    <label for="bot-port">Port:</label>
-                    <input type="number" id="bot-port" value="23028">
-                    
-                    <label for="bot-version">Version:</label>
-                    <input type="text" id="bot-version" value="1.18.2">
-                    
-                    <label>
-                        <input type="checkbox" id="bot-auto-reconnect" checked>
-                        Auto Reconnect
-                    </label>
-                    
-                    <label for="bot-proxy">Proxy (optional):</label>
-                    <select id="bot-proxy">
-                        <option value="">Direct</option>
-                        <!-- Opsi proxy akan diisi oleh script.js -->
-                    </select>
-                    
-                    <button type="submit" class="btn btn-primary">Create Bot</button>
-                </form>
+        
+        <div class="bot-stats">
+            <div class="stat">
+                <label>Health:</label>
+                <div class="progress-bar">
+                    <div class="progress-fill health" style="width: ${(bot.health / 20) * 100}%"></div>
+                </div>
+                <span>${bot.health}/20</span>
+            </div>
+            
+            <div class="stat">
+                <label>Food:</label>
+                <div class="progress-bar">
+                    <div class="progress-fill food" style="width: ${(bot.food / 20) * 100}%"></div>
+                </div>
+                <span>${bot.food}/20</span>
+            </div>
+            
+            <div class="stat">
+                <label>Ping:</label>
+                <span>${bot.ping}ms</span>
+            </div>
+            
+            <div class="stat">
+                <label>Proxy:</label>
+                <span>${bot.proxy}</span>
             </div>
         </div>
-
-        <div class="main-content">
-            <div class="bots-grid" id="bots-grid">
-                <!-- Bot cards will be inserted here -->
+        
+        <div class="bot-actions">
+            <button class="btn btn-small btn-secondary" onclick="sendBotCommand('${bot.id}', '/survival')">Survival</button>
+            <button class="btn btn-small btn-secondary" onclick="sendBotCommand('${bot.id}', '/spawn')">Spawn</button>
+        </div>
+        
+        <div class="bot-players">
+            <label>Online Players (${bot.onlinePlayers ? Object.keys(bot.onlinePlayers).length : 0}):</label>
+            <div class="players-list">
+                ${bot.onlinePlayers ? Object.keys(bot.onlinePlayers).map(player => 
+                    `<span class="player">${player}</span>`
+                ).join('') : ''}
             </div>
         </div>
+    `;
 
-        <div class="global-chat">
-            <h3>Global Chat</h3>
-            <div id="console-output" class="console-output"></div>
-            <div class="chat-input-container">
-                <select id="chat-target">
-                    <option value="all">All Bots</option>
-                </select>
-                <input type="text" id="chat-input" placeholder="Enter command or message...">
-                <button id="send-btn" class="btn btn-primary">Send</button>
-            </div>
-        </div>
-    </div>
+    return card;
+}
 
-    <script src="script.js"></script>
-</body>
-</html>
+function updateBotCard(bot) {
+    const existingCard = document.getElementById(`bot-${bot.id}`);
+    if (existingCard) {
+        const newCard = createBotCard(bot);
+        existingCard.replaceWith(newCard);
+    } else {
+        botsGrid.appendChild(createBotCard(bot));
+    }
+    
+    // Update chat target dropdown
+    updateChatTargets();
+}
+
+function updateChatTargets() {
+    const currentValue = chatTarget.value;
+    chatTarget.innerHTML = '<option value="all">All Bots</option>';
+    
+    allBots.forEach((bot, botId) => {
+        const option = document.createElement('option');
+        option.value = botId;
+        option.textContent = `Bot ${bot.username}`;
+        chatTarget.appendChild(option);
+    });
+    
+    if (chatTarget.querySelector(`option[value="${currentValue}"]`)) {
+        chatTarget.value = currentValue;
+    }
+}
+
+function removeBot(botId) {
+    if (confirm(`Are you sure you want to remove bot ${botId}?`)) {
+        socket.emit('removeBot', botId);
+    }
+}
+
+function sendBotCommand(botId, command) {
+    addToConsole(`Sending command to bot ${botId}: ${command}`, 'chat');
+    // You can emit a socket event here to send commands to specific bots
+}
+
+// Socket event listeners
+socket.on('connect', () => {
+    addToConsole('Connected to server', 'system');
+});
+
+socket.on('disconnect', () => {
+    addToConsole('Disconnected from server', 'error');
+});
+
+socket.on('allStatsUpdate', (stats) => {
+    allBots.clear();
+    botsGrid.innerHTML = '';
+    
+    stats.forEach(bot => {
+        allBots.set(bot.id, bot);
+        updateBotCard(bot);
+    });
+    
+    activeBotCount.textContent = stats.length;
+});
+
+socket.on('botCreated', (data) => {
+    addToConsole(`Bot created: ${data.config.username}`, 'system');
+});
+
+socket.on('chatMessage', (data) => {
+    addToConsole(`[BOT-${data.botId}] ${data.message}`, 'chat');
+});
+
+socket.on('error', (error) => {
+    addToConsole(`Error: ${error}`, 'error');
+    alert(`Error: ${error}`);
+});

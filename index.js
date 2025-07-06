@@ -19,6 +19,14 @@ const app = express()
 const server = http.createServer(app)
 const io = socketIo(server)
 const PORT = process.env.PORT || 3000
+const SocksClient = require('socks5-client'); // Tambahkan ini
+
+// Daftar proxy SOCKS5
+const socks5ProxyList = [
+    { name: 'Proxy 1', host: '127.0.0.1', port: 1080 },
+    { name: 'Proxy 2', host: '199.102.104.70', port: 4145 },
+    { name: 'Proxy 3', host: '184.181.217.194' , port: 4145 },
+];
 
 // Multi-bot management
 let bots = new Map(); // Store all bot instances
@@ -92,8 +100,13 @@ function getRandomProxy() {
 
 function createBot(config) {
     const botId = config.id;
-    const proxy = getRandomProxy();
-    
+    let proxy = null;
+
+    // Pilih proxy jika ada
+    if (config.proxyType === 'socks5' && config.proxyIndex !== undefined) {
+        proxy = socks5ProxyList[config.proxyIndex];
+    }
+
     const botOptions = {
         host: config.host || "localmc.club",
         port: config.port || 23028,
@@ -101,6 +114,20 @@ function createBot(config) {
         version: config.version || "1.18.2",
         viewDistance: 12
     };
+
+    // SOCKS5 Proxy support
+    if (proxy) {
+        botOptions.connect = (client) => {
+            const net = require('net');
+            const socks = require('socks5-client');
+            const socket = new socks.Socks5ClientSocket(proxy.host, proxy.port);
+            socket.on('error', (err) => {
+                console.log(`[BOT-${botId}] SOCKS5 Proxy error:`, err.message);
+            });
+            return socket;
+        };
+        console.log(`[BOT-${botId}] Using SOCKS5 proxy: ${proxy.host}:${proxy.port}`);
+    }
 
     // Add proxy if available
     if (proxy) {
@@ -341,6 +368,10 @@ app.get('/api/bots', (req, res) => {
     res.json(botsInfo);
 });
 
+app.get('/api/proxies', (req, res) => {
+    res.json(socks5ProxyList.map((p, i) => ({ index: i, name: p.name, host: p.host, port: p.port })));
+});
+
 // Socket.io connection
 io.on('connection', (socket) => {
     console.log('Client connected to web interface');
@@ -372,166 +403,112 @@ io.on('connection', (socket) => {
     socket.on('removeBot', (botId) => {
         const bot = bots.get(botId);
         if (bot) {
-            bot.end();
+            bot.quit();
             bots.delete(botId);
-            allBotStats.delete(botId);
             botConfigs = botConfigs.filter(config => config.id !== botId);
             activeBots--;
-            socket.emit('botRemoved', botId);
+            console.log(`Bot ${botId} removed`);
             broadcastStats();
-        }
-    });
-    
-    // Handle chat messages from web interface
-    socket.on('sendChat', (data) => {
-        const { botId, message } = data;
-        if (botId === 'all') {
-            for (const [id, bot] of bots) {
-                bot.chat(message);
-            }
-            console.log(`[WEB CHAT to ALL] ${message}`);
         } else {
-            const bot = bots.get(botId);
-            if (bot && message.trim()) {
-                bot.chat(message);
-                console.log(`[WEB CHAT to BOT-${botId}] ${message}`);
-            }
+            socket.emit('error', 'Bot not found');
         }
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('Client disconnected from web interface');
     });
 });
 
-// Helper functions
-async function executeAutoShop(bot) {
-    let loop = 0;
-    const maxLoop = 500;
-    console.log(`[BOT-${bot.botId}] Memulai auto shop mobdrops sebanyak ${maxLoop} kali...`);
-    for (loop = 1; loop <= maxLoop; loop++) {
-        try {
-            console.log(`[BOT-${bot.botId}] Loop ke-${loop}`);
-            bot.chat('/shop mobdrops');
-            // Tunggu window terbuka
-            const window = await waitWindowOpen(bot, 5000);
-
-            // Klik slot 11
-            await bot.clickWindow(11, 0, 0);
-            await delay(500);
-
-            // Klik slot 31
-            await bot.clickWindow(31, 0, 0);
-            await delay(500);
-
-            // Klik slot 8
-            await bot.clickWindow(8, 0, 0);
-            await delay(500);
-
-            // Tutup window
-            bot.closeWindow(window);
-            await delay(5000);
-        } catch (err) {
-            console.log(`[BOT-${bot.botId}] Error pada loop ke-${loop}:`, err.message);
-            break;
-        }
-    }
-    console.log(`[BOT-${bot.botId}] Selesai auto shop mobdrops.`);
-}
-
-function updateBotStats(botId) {
-    const bot = bots.get(botId);
-    if (!bot) return;
-    
-    const stats = allBotStats.get(botId);
-    stats.health = bot.health || 0;
-    stats.food = bot.food || 0;
-    stats.ping = bot._client.latency || 0;
-    
-    allBotStats.set(botId, stats);
-    broadcastStats();
-}
-
-function updateOnlinePlayers(botId) {
-    const bot = bots.get(botId);
-    if (!bot) return;
-    
-    const stats = allBotStats.get(botId);
-    stats.onlinePlayers = Object.keys(bot.players).map(playerName => {
-        const player = bot.players[playerName];
-        return {
-            name: playerName,
-            ping: player.ping || 0
-        };
-    });
-    
-    allBotStats.set(botId, stats);
-    broadcastStats();
-}
-
+// Broadcast stats to all connected web clients
 function broadcastStats() {
     io.emit('allStatsUpdate', Array.from(allBotStats.values()));
 }
 
-server.listen(PORT, () => {
-    console.log(`Web server running on port ${PORT}`);
-    if (process.env.HEROKU_APP_NAME) {
-        console.log(`Akses web di: https://${process.env.HEROKU_APP_NAME}.herokuapp.com/`);
-    } else {
-        console.log('Akses web di: https://localmcbot-2885511c2fdc.herokuapp.com/');
+// Update bot stats
+function updateBotStats(botId) {
+    const bot = bots.get(botId);
+    if (bot) {
+        const stats = allBotStats.get(botId);
+        if (stats) {
+            stats.health = bot.health;
+            stats.food = bot.food;
+            stats.ping = bot.ping;
+            stats.onlinePlayers = bot.players;
+            allBotStats.set(botId, stats);
+        }
+    }
+}
+
+// Auto join survival mode
+function autoJoinSurvival(bot) {
+    console.log(`[BOT-${bot.botId}] Mencoba untuk bergabung ke survival...`);
+    bot.chat("/survival");
+}
+
+// Schedule survival mode at 1 AM
+function scheduleSurvivalAt1AM(bot) {
+    const now = new Date();
+    const millisTill1AM = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 1 ? 1 : 0), 1, 0, 0, 0) - now;
+    setTimeout(() => {
+        console.log(`[BOT-${bot.botId}] Bergabung ke survival mode secara otomatis jam 01:00`);
+        autoJoinSurvival(bot);
+        
+        // Jadwalkan ulang untuk hari berikutnya
+        scheduleSurvivalAt1AM(bot);
+    }, millisTill1AM);
+}
+
+// Update daftar pemain online
+function updateOnlinePlayers(botId) {
+    const bot = bots.get(botId);
+    if (bot) {
+        const message = bot.players;
+        const stats = allBotStats.get(botId);
+        if (stats) {
+            stats.onlinePlayers = message;
+            allBotStats.set(botId, stats);
+        }
+    }
+}
+
+// Uji coba koneksi ke server Minecraft
+async function testConnection(config) {
+    return new Promise((resolve, reject) => {
+        const bot = mineflayer.createBot({
+            host: config.host,
+            port: config.port,
+            username: config.username,
+            version: config.version || "1.18.2",
+            auth: config.auth || 'mojang',
+            // Jangan tambahkan proxy di sini
+        });
+
+        bot.once('spawn', () => {
+            bot.quit();
+            resolve(true);
+        });
+
+        bot.on('error', (err) => {
+            bot.quit();
+            reject(err);
+        });
+
+        bot.on('kicked', (reason) => {
+            bot.quit();
+            reject(new Error(`Kicked: ${reason}`));
+        });
+    });
+}
+
+// Endpoint untuk menguji koneksi
+app.post('/api/test-connection', express.json(), async (req, res) => {
+    const config = req.body;
+    try {
+        // Uji coba koneksi tanpa menambahkan proxy
+        await testConnection(config);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// Start with one default bot (configurable via env)
-setTimeout(() => {
-    const defaultConfig = {
-        id: 'default',
-        username: process.env.BOT_USERNAME || 'Master1140ID',
-        password: process.env.BOT_PASSWORD || 'MASTER09',
-        host: process.env.BOT_HOST || 'localmc.club',
-        port: process.env.BOT_PORT ? parseInt(process.env.BOT_PORT) : 23028,
-        version: process.env.BOT_VERSION || '1.18.2',
-        autoReconnect: true
-    };
-    
-    const bot = createBot(defaultConfig);
-    bots.set('default', bot);
-    botConfigs.push(defaultConfig);
-    activeBots++;
-}, 1000);
-
-// Tambahkan fungsi auto join survival
-async function autoJoinSurvival(bot, maxRetry = 10) {
-    let retry = 0;
-    while (retry < maxRetry) {
-        try {
-            bot.chat(`/login ${bot.config.password}`);
-            await delay(2000);
-            bot.chat('/survival');
-            console.log(`[BOT-${bot.botId}] Attempted to rejoin survival (try ${retry + 1}/${maxRetry})`);
-            await delay(60000); // 1 menit
-            // Cek status, jika sudah masuk survival bisa break
-            // (Anda bisa tambahkan pengecekan status di sini jika ada indikator)
-        } catch (e) {
-            console.log(`[BOT-${bot.botId}] Error auto join survival:`, e.message);
-        }
-        retry++;
-    }
-}
-
-// Penjadwalan ulang survival jam 01.00
-function scheduleSurvivalAt1AM(bot) {
-    const now = new Date();
-    const next1AM = new Date(now);
-    next1AM.setHours(1, 0, 0, 0);
-    if (now > next1AM) next1AM.setDate(now.getDate() + 1);
-    const msUntil1AM = next1AM - now;
-    setTimeout(() => {
-        bot.chat(`/login ${bot.config.password}`);
-        setTimeout(() => {
-            bot.chat('/survival');
-            console.log(`[BOT-${bot.botId}] Scheduled /survival at 01:00`);
-        }, 2000);
-        scheduleSurvivalAt1AM(bot); // Reschedule for next day
-    }, msUntil1AM);
-}
+// Jalankan server
+server.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
+});

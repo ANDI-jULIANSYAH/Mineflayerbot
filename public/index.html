@@ -1,176 +1,3 @@
-Skip to content
-Files
-Commands
-Search
-Packager files
-Chats
-Archived
-heroku deployment nodejs application setup guide
-just now
-minecraft bot management program
-39 minutes ago
-sekarang bikin agar code tersebut bisa digunakan di heroku
-
-web: index.js
-
-M1
-
-jomijep938
-Assistant
-just now
-I can help you make this code compatible with Heroku deployment. The main changes needed are:
-
-Use process.env.PORT for the port (Heroku assigns this dynamically)
-Create a Procfile for Heroku
-Ensure the server binds to 0.0.0.0
-Let me make these changes:
-
-Index.js
-Procfile
-The changes I made:
-
-Port Configuration: The code already uses process.env.PORT || 5000 which is perfect for Heroku
-Server Binding: Changed to bind to 0.0.0.0 to make it accessible externally
-Procfile: Created a Procfile that tells Heroku to run node Index.js as a web process
-Your app is now ready for Heroku deployment. The process.env.PORT will be automatically set by Heroku, and the Procfile tells Heroku how to start your application.
-
-Assistant can automatically apply proposed changes to your App. You can enable this behavior in 
-.
-Assistant automatically restarted your App after applying file changes. You can disable this behavior in 
-.
-Checkpoint made
-Configure app for Heroku deployment
-just now
-•
-
-Scroll to latest
-Assistant mode
-
-advanced
-Claude 4.0 Sonnet
-
-Ask Assistant, use @ to include specific files...
-# This is a replit for full-stack Javascript/TypeScript projects
-# It is has additional configs typical and useful for developers of projects like Vite
-
-hidden=[".config", ".gitignore", ".github", "node_modules", "pnpm-lock.yaml", "tsconfig.json", "tsconfig.node.json", "vite.config.ts"]
-
-# onBoot=['echo', '$PATH'] # ⚠ node is not in env, yet
-# onBoot=['echo', 'rebooted..'] # Runs on reboot, very limited ENV vars
-# compile="npm i" # No runtime ENV vars
-# run = ["npm", "run", "dev"] # Use TOML's """ for a multiline bash script
-run = """
-source ./.config/bashrc
-echo NodeJS Version: $(node --version)
-clear
-bash --norc
-""" # "
-
-entrypoint = ".replit"
-modules = ["nodejs-18"]
-
-# [[ports]]
-# localPort = 5173
-# remotePort = 80
-
-
-[nix]
-channel = "stable-24_05"
-
-[env]
-PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin:./node_modules/.bin"
-npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global" # Global install support
-npm_config_yes="true" # This is a safe space, don't ask stupid questions
-NODE_OPTIONS="--max_old_space_size=384"
-# EDITOR="replit-git-editor" # Not reliable, use curl replspace instead
-#NODE_NO_WARNINGS="1"
-
-# Disables UPM, which BREAKS with PNPM, NPM v9, PNPM/Turbo/Yarn/Deno/Bun etc
-[packager]
-language = "no" # nodejs-npm / nodejs-yarn
-ignoredPaths = ["."] # disables guessImports
-
-[languages.typescript]
-pattern = "**/{*.ts,*.js,*.tsx,*.jsx}"
-syntax = "typescript"
- 
-  [languages.typescript.languageServer]
-  start = [ "typescript-language-server", "--stdio" ]
-
-# CWD is not supported
-#   As a workaround, use Node 19 with --import and a helper script that CD's to a directory based on env vars
-[debugger]
-support = true
-
-  [debugger.interactive]
-  transport = "localhost:0"
-  startCommand = [ "dap-node" ]
-
-  [debugger.interactive.initializeMessage]
-  command = "initialize"
-  type = "request"
-
-  [debugger.interactive.initializeMessage.arguments]
-  clientID = "replit"
-  clientName = "replit.com"
-Selection deleted
-
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const mineflayer = require('mineflayer');
-const path = require('path');
-
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-
-// Store active bots
-const activeBots = new Map();
-let botCounter = 0;
-
-// Middleware
-app.use(express.static('public'));
-app.use(express.json());
-
-// Serve the main page
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// API Routes
-app.post('/api/create-bot', (req, res) => {
-    const { username, host, port, password, loginType, version } = req.body;
-    
-    try {
-        const botId = `bot_${++botCounter}`;
-        createBot(botId, { username, host, port, password, loginType, version });
-        res.json({ success: true, botId, message: 'Bot created successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-app.post('/api/disconnect-bot/:botId', (req, res) => {
-    const { botId } = req.params;
-    
-    if (activeBots.has(botId)) {
-        const botData = activeBots.get(botId);
-        botData.bot.quit();
-        activeBots.delete(botId);
-        
-        io.emit('bot-disconnected', { botId });
-        res.json({ success: true, message: 'Bot disconnected' });
-    } else {
-        res.status(404).json({ success: false, message: 'Bot not found' });
-
-10s
- • 
-Just now
-Port :5000 opened on
-/
-Ready to share with the world?
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -179,6 +6,334 @@ Ready to share with the world?
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mineflayer Bot Manager</title>
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .bot-form {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .bot-list {
+            margin-top: 20px;
+        }
+        .bot-item {
+            background-color: #f5f5f5;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .bot-status {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .bot-status.disconnected {
+            color: #f44336;
+        }
+        .chat-box {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #fff;
+            margin-bottom: 10px;
+        }
+        .logs {
+            background-color: #1e1e1e;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Mineflayer Bot Manager</h1>
+        
+        <div class="bot-form">
+            <h2>Create New Bot</h2>
+            <form id="botForm">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="host">Server Host:</label>
+                    <input type="text" id="host" name="host" value="localhost" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="port">Port:</label>
+                    <input type="number" id="port" name="port" value="25565" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password (optional):</label>
+                    <input type="password" id="password" name="password">
+                </div>
+                
+                <div class="form-group">
+                    <label for="loginType">Login Type:</label>
+                    <select id="loginType" name="loginType">
+                        <option value="offline">Offline</option>
+                        <option value="microsoft">Microsoft</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="version">Version (optional):</label>
+                    <input type="text" id="version" name="version" placeholder="1.19.2">
+                </div>
+                
+                <button type="submit">Create Bot</button>
+            </form>
+        </div>
+        
+        <div class="bot-list">
+            <h2>Active Bots</h2>
+            <div id="botList"></div>
+        </div>
+        
+        <div class="logs">
+            <h3>System Logs</h3>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        // Form submission
+        document.getElementById('botForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                username: document.getElementById('username').value,
+                host: document.getElementById('host').value,
+                port: document.getElementById('port').value,
+                password: document.getElementById('password').value,
+                loginType: document.getElementById('loginType').value,
+                version: document.getElementById('version').value
+            };
+            
+            try {
+                const response = await fetch('/api/create-bot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`✅ Bot created: ${formData.username}`);
+                    document.getElementById('botForm').reset();
+                    updateBotList();
+                } else {
+                    addLog(`❌ Error: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        });
+        
+        // Socket event listeners
+        socket.on('bot-login', (data) => {
+            addLog(`🔐 Bot ${data.username} logged in`);
+            updateBotList();
+        });
+        
+        socket.on('bot-spawn', (data) => {
+            addLog(`🎮 Bot ${data.username} spawned`);
+            updateBotList();
+        });
+        
+        socket.on('bot-chat', (data) => {
+            addLog(`💬 [${data.username}] ${data.message}`);
+        });
+        
+        socket.on('bot-health', (data) => {
+            addLog(`❤️ Bot health: ${data.health}, food: ${data.food}`);
+        });
+        
+        socket.on('bot-death', (data) => {
+            addLog(`💀 Bot ${data.username} died`);
+        });
+        
+        socket.on('bot-kicked', (data) => {
+            addLog(`⚠️ Bot ${data.username} was kicked: ${data.reason}`);
+        });
+        
+        socket.on('bot-error', (data) => {
+            addLog(`❌ Bot ${data.username} error: ${data.error}`);
+        });
+        
+        socket.on('bot-attack', (data) => {
+            addLog(`⚔️ Bot ${data.username} attacking ${data.target}`);
+        });
+        
+        // Update bot list
+        async function updateBotList() {
+            try {
+                const response = await fetch('/api/bots');
+                const bots = await response.json();
+                
+                const botListDiv = document.getElementById('botList');
+                botListDiv.innerHTML = '';
+                
+                bots.forEach(bot => {
+                    const botDiv = document.createElement('div');
+                    botDiv.className = 'bot-item';
+                    botDiv.innerHTML = `
+                        <h3>${bot.username}</h3>
+                        <p><strong>Host:</strong> ${bot.host}:${bot.port}</p>
+                        <p><strong>Status:</strong> <span class="bot-status ${bot.status}">${bot.status}</span></p>
+                        <p><strong>Health:</strong> ${bot.health} | <strong>Food:</strong> ${bot.food}</p>
+                        <p><strong>Auto Farm:</strong> ${bot.autoFarm ? 'ON' : 'OFF'}</p>
+                        <button onclick="disconnectBot('${bot.id}')">Disconnect</button>
+                        <button onclick="toggleAutoFarm('${bot.id}')">Toggle Auto Farm</button>
+                        <input type="text" id="chatInput_${bot.id}" placeholder="Send chat message...">
+                        <button onclick="sendChat('${bot.id}')">Send</button>
+                    `;
+                    botListDiv.appendChild(botDiv);
+                });
+            } catch (error) {
+                addLog(`❌ Error updating bot list: ${error.message}`);
+            }
+        }
+        
+        // Disconnect bot
+        async function disconnectBot(botId) {
+            try {
+                const response = await fetch(`/api/disconnect-bot/${botId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`✅ Bot disconnected`);
+                    updateBotList();
+                } else {
+                    addLog(`❌ Error: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        // Toggle auto farm
+        async function toggleAutoFarm(botId) {
+            try {
+                const response = await fetch(`/api/toggle-auto-farm/${botId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`✅ ${result.message}`);
+                    updateBotList();
+                } else {
+                    addLog(`❌ Error: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        // Send chat
+        async function sendChat(botId) {
+            const chatInput = document.getElementById(`chatInput_${botId}`);
+            const message = chatInput.value.trim();
+            
+            if (!message) return;
+            
+            try {
+                const response = await fetch(`/api/send-chat/${botId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`📤 Message sent: ${message}`);
+                    chatInput.value = '';
+                } else {
+                    addLog(`❌ Error: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        // Add log
+        function addLog(message) {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logsDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        // Initialize
+        updateBotList();
+        addLog('🚀 Bot Manager initialized');
+    </script>
+</body>
     <style>
         * {
             margin: 0;
@@ -234,4 +389,455 @@ Ready to share with the world?
         }
 
         input:focus, select:focus {
-Loading... - Replit
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+        }
+
+        .bot-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .bot-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .bot-card.connected {
+            border-color: #51cf66;
+            background: #f3fff3;
+        }
+
+        .bot-card.disconnected {
+            border-color: #ff6b6b;
+            background: #fff3f3;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-connected {
+            background: #51cf66;
+            color: white;
+        }
+
+        .status-disconnected {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .console {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+        }
+
+        .health-bar {
+            background: #ff6b6b;
+            height: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+
+        .food-bar {
+            background: #ffc107;
+            height: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .farm-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .farm-active {
+            background: #51cf66;
+            color: white;
+        }
+
+        .farm-inactive {
+            background: #868e96;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Mineflayer Bot Manager</h1>
+            <p>Create and manage multiple Minecraft bots</p>
+        </div>
+
+        <div class="row">
+            <div class="card">
+                <h2>Create New Bot</h2>
+                <form id="createBotForm">
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="host">Server Host:</label>
+                        <input type="text" id="host" name="host" value="localhost" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="port">Port:</label>
+                        <input type="number" id="port" name="port" value="25565" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password (for /login):</label>
+                        <input type="password" id="password" name="password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginType">Login Type:</label>
+                        <select id="loginType" name="loginType">
+                            <option value="crack">Cracked</option>
+                            <option value="microsoft">Microsoft</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="version">Version (optional):</label>
+                        <input type="text" id="version" name="version" placeholder="e.g., 1.19.4">
+                    </div>
+                    
+                    <button type="submit" class="btn">Create Bot</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Global Console</h2>
+                <div id="globalConsole" class="console"></div>
+                <div class="form-group">
+                    <button onclick="refreshBots()" class="btn">Refresh Bots</button>
+                    <button onclick="clearConsole()" class="btn btn-danger">Clear Console</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Active Bots</h2>
+            <div id="botList" class="bot-list">
+                <p>No bots created yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let bots = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshBots();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Form submission
+            document.getElementById('createBotForm').addEventListener('submit', createBot);
+
+            // Socket events
+            socket.on('bot-login', (data) => {
+                addToConsole(`✅ Bot ${data.username} logged in`);
+                refreshBots();
+            });
+
+            socket.on('bot-spawn', (data) => {
+                addToConsole(`🌍 Bot ${data.username} spawned at ${JSON.stringify(data.position)}`);
+            });
+
+            socket.on('bot-chat', (data) => {
+                addToConsole(`💬 [${data.username}] ${data.message}`);
+            });
+
+            socket.on('bot-health', (data) => {
+                updateBotStats(data.botId, data.health, data.food);
+            });
+
+            socket.on('bot-death', (data) => {
+                addToConsole(`💀 Bot ${data.username} died`);
+            });
+
+            socket.on('bot-kicked', (data) => {
+                addToConsole(`❌ Bot ${data.username} was kicked: ${data.reason}`);
+                refreshBots();
+            });
+
+            socket.on('bot-end', (data) => {
+                addToConsole(`🔌 Bot ${data.username} disconnected`);
+                refreshBots();
+            });
+
+            socket.on('bot-error', (data) => {
+                addToConsole(`⚠️ Bot ${data.username} error: ${data.error}`);
+            });
+
+            socket.on('bot-reconnect-failed', (data) => {
+                addToConsole(`🔄 Reconnection failed for ${data.username}`);
+            });
+
+            socket.on('bot-max-reconnect-reached', (data) => {
+                addToConsole(`❌ Max reconnection attempts reached for ${data.username}`);
+                refreshBots();
+            });
+
+            socket.on('bots-list', (botList) => {
+                bots = botList;
+                renderBots();
+            });
+
+            socket.on('bot-attack', (data) => {
+                addToConsole(`⚔️ Bot ${data.username} attacking ${data.target}`);
+            });
+        }
+
+        async function createBot(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const botData = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/api/create-bot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(botData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addToConsole(`🤖 Creating bot ${botData.username}...`);
+                    e.target.reset();
+                    refreshBots();
+                } else {
+                    addToConsole(`❌ Failed to create bot: ${result.message}`);
+                }
+            } catch (error) {
+                addToConsole(`❌ Error creating bot: ${error.message}`);
+            }
+        }
+
+        async function disconnectBot(botId) {
+            try {
+                const response = await fetch(`/api/disconnect-bot/${botId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addToConsole(`🔌 Bot disconnected`);
+                    refreshBots();
+                } else {
+                    addToConsole(`❌ Failed to disconnect bot: ${result.message}`);
+                }
+            } catch (error) {
+                addToConsole(`❌ Error disconnecting bot: ${error.message}`);
+            }
+        }
+
+        async function sendChat(botId, message) {
+            if (!message.trim()) return;
+            
+            try {
+                const response = await fetch(`/api/send-chat/${botId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addToConsole(`📤 Message sent: ${message}`);
+                } else {
+                    addToConsole(`❌ Failed to send message: ${result.message}`);
+                }
+            } catch (error) {
+                addToConsole(`❌ Error sending message: ${error.message}`);
+            }
+        }
+
+        async function toggleAutoFarm(botId) {
+            try {
+                const response = await fetch(`/api/toggle-auto-farm/${botId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addToConsole(`🤖 Auto farm ${result.autoFarm ? 'started' : 'stopped'}`);
+                    refreshBots();
+                } else {
+                    addToConsole(`❌ Failed to toggle auto farm: ${result.message}`);
+                }
+            } catch (error) {
+                addToConsole(`❌ Error toggling auto farm: ${error.message}`);
+            }
+        }
+
+        function refreshBots() {
+            socket.emit('get-bots');
+        }
+
+        function renderBots() {
+            const botList = document.getElementById('botList');
+            
+            if (bots.length === 0) {
+                botList.innerHTML = '<p>No bots created yet.</p>';
+                return;
+            }
+            
+            botList.innerHTML = bots.map(bot => `
+                <div class="bot-card ${bot.status}">
+                    <h3>${bot.username}</h3>
+                    <p><strong>Server:</strong> ${bot.host}:${bot.port}</p>
+                    <p>
+                        <strong>Status:</strong> <span class="status-badge status-${bot.status}">${bot.status}</span>
+                        <span class="farm-status ${bot.autoFarm ? 'farm-active' : 'farm-inactive'}">
+                            ${bot.autoFarm ? 'Farming' : 'Idle'}
+                        </span>
+                    </p>
+                    
+                    <div>
+                        <small>Health: ${bot.health}/20</small>
+                        <div class="health-bar" style="width: ${(bot.health/20)*100}%"></div>
+                    </div>
+                    
+                    <div>
+                        <small>Food: ${bot.food}/20</small>
+                        <div class="food-bar" style="width: ${(bot.food/20)*100}%"></div>
+                    </div>
+                    
+                    <div class="chat-input" style="margin-top: 15px;">
+                        <input type="text" placeholder="Send chat message..." id="chat-${bot.id}">
+                        <button class="btn btn-success" onclick="sendChatMessage('${bot.id}')">Send</button>
+                    </div>
+                    
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn ${bot.autoFarm ? 'btn-danger' : 'btn-success'}" onclick="toggleAutoFarm('${bot.id}')">
+                            ${bot.autoFarm ? 'Stop Farm' : 'Start Farm'}
+                        </button>
+                        <button class="btn btn-danger" onclick="disconnectBot('${bot.id}')">Disconnect</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function sendChatMessage(botId) {
+            const input = document.getElementById(`chat-${botId}`);
+            const message = input.value.trim();
+            
+            if (message) {
+                sendChat(botId, message);
+                input.value = '';
+            }
+        }
+
+        function updateBotStats(botId, health, food) {
+            const bot = bots.find(b => b.id === botId);
+            if (bot) {
+                bot.health = health;
+                bot.food = food;
+                renderBots();
+            }
+        }
+
+        function addToConsole(message) {
+            const console = document.getElementById('globalConsole');
+            const timestamp = new Date().toLocaleTimeString();
+            console.innerHTML += `[${timestamp}] ${message}\n`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('globalConsole').innerHTML = '';
+        }
+
+        // Handle Enter key in chat inputs
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id.startsWith('chat-')) {
+                const botId = e.target.id.replace('chat-', '');
+                sendChatMessage(botId);
+            }
+        });
+    </script>
+</body>
+</html>

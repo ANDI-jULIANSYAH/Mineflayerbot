@@ -260,7 +260,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Mineflayer Bot Manager running on port ${PORT}`);
-    console.log(`Access the web interface at http://localhost:${PORT}`);
+    console.log(`Access the web interface at http://0.0.0.0:${PORT}`);
 });
 
 function startAutoFarm(botId) {

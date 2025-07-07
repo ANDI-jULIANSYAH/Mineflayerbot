@@ -120,9 +120,10 @@ function createBot(botId, config) {
         bot,
         config,
         reconnectAttempts: 0,
-        maxReconnectAttempts: 5,
+        maxReconnectAttempts: 3,
         autoFarm: false,
-        farmInterval: null
+        farmInterval: null,
+        isReconnecting: false
     });
 
     // Bot event handlers
@@ -187,18 +188,37 @@ function createBot(botId, config) {
     bot.on('kicked', (reason) => {
         console.log(`Bot ${config.username} was kicked: ${reason}`);
         io.emit('bot-kicked', { botId, username: config.username, reason });
+        
+        // Don't reconnect if kicked for being already online or logging in too fast
+        const reasonStr = JSON.stringify(reason);
+        if (reasonStr.includes('already online') || reasonStr.includes('logging in too fast')) {
+            console.log(`Bot ${config.username} not reconnecting due to login conflict`);
+            return;
+        }
+        
         handleReconnect(botId);
     });
 
     bot.on('end', () => {
         console.log(`Bot ${config.username} disconnected`);
         io.emit('bot-end', { botId, username: config.username });
-        handleReconnect(botId);
+        
+        // Add delay before reconnecting
+        setTimeout(() => {
+            handleReconnect(botId);
+        }, 5000);
     });
 
     bot.on('error', (err) => {
         console.log(`Bot ${config.username} error:`, err.message);
         io.emit('bot-error', { botId, username: config.username, error: err.message });
+        
+        // Don't reconnect on certain errors
+        if (err.message.includes('ECONNRESET') || err.message.includes('ECONNREFUSED')) {
+            console.log(`Bot ${config.username} not reconnecting due to connection error`);
+            return;
+        }
+        
         handleReconnect(botId);
     });
 
@@ -209,6 +229,12 @@ function handleReconnect(botId) {
     const botData = activeBots.get(botId);
     if (!botData) return;
 
+    // Prevent multiple reconnection attempts
+    if (botData.isReconnecting) {
+        return;
+    }
+    
+    botData.isReconnecting = true;
     botData.reconnectAttempts++;
     
     if (botData.reconnectAttempts <= botData.maxReconnectAttempts) {
@@ -216,16 +242,23 @@ function handleReconnect(botId) {
         
         setTimeout(() => {
             try {
+                // Check if bot still exists and should reconnect
+                if (!activeBots.has(botId)) {
+                    return;
+                }
+                
                 // Remove old bot
                 botData.bot.removeAllListeners();
                 
                 // Create new bot with same config
-                createBot(botId, botData.config);
+                const newBot = createBot(botId, botData.config);
+                botData.isReconnecting = false;
             } catch (error) {
                 console.log(`Reconnection failed for ${botData.config.username}:`, error.message);
+                botData.isReconnecting = false;
                 io.emit('bot-reconnect-failed', { botId, username: botData.config.username });
             }
-        }, 5000 * botData.reconnectAttempts); // Exponential backoff
+        }, 10000 * botData.reconnectAttempts); // Longer backoff to prevent server kicks
     } else {
         console.log(`Max reconnection attempts reached for bot ${botData.config.username}`);
         activeBots.delete(botId);
@@ -260,7 +293,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Mineflayer Bot Manager running on port ${PORT}`);
-    console.log(`Access the web interface at http://0.0.0.0:${PORT}`);
+    console.log(`Access the web interface at http://localhost:${PORT}`);
 });
 
 function startAutoFarm(botId) {

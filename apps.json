@@ -1,0 +1,20 @@
+
+{
+  "name": "Mineflayer Bot Manager",
+  "description": "A web-based Minecraft bot manager using Mineflayer",
+  "repository": "https://github.com/your-username/mineflayer-bot-manager",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "minecraft", "mineflayer", "bot"],
+  "image": "heroku/nodejs",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment",
+      "value": "production"
+    }
+  }
+}

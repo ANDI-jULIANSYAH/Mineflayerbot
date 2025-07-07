@@ -1,4 +1,9 @@
 {
+  "name": "mineflayer-bot-manager",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node Index.js"
+  },
   "dependencies": {
     "express": "^5.1.0",
     "mineflayer": "^4.29.0",
@@ -7,5 +12,8 @@
     "socks5-client": "^1.2.8",
     "sqlite3": "^5.1.7",
     "yarm": "^0.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

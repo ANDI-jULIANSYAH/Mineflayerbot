@@ -1,129 +1,237 @@
+Skip to content
+Files
+Commands
+Search
+Packager files
+Chats
+Archived
+heroku deployment nodejs application setup guide
+just now
+minecraft bot management program
+39 minutes ago
+sekarang bikin agar code tersebut bisa digunakan di heroku
+
+web: index.js
+
+M1
+
+jomijep938
+Assistant
+just now
+I can help you make this code compatible with Heroku deployment. The main changes needed are:
+
+Use process.env.PORT for the port (Heroku assigns this dynamically)
+Create a Procfile for Heroku
+Ensure the server binds to 0.0.0.0
+Let me make these changes:
+
+Index.js
+Procfile
+The changes I made:
+
+Port Configuration: The code already uses process.env.PORT || 5000 which is perfect for Heroku
+Server Binding: Changed to bind to 0.0.0.0 to make it accessible externally
+Procfile: Created a Procfile that tells Heroku to run node Index.js as a web process
+Your app is now ready for Heroku deployment. The process.env.PORT will be automatically set by Heroku, and the Procfile tells Heroku how to start your application.
+
+Assistant can automatically apply proposed changes to your App. You can enable this behavior in 
+.
+Assistant automatically restarted your App after applying file changes. You can disable this behavior in 
+.
+Checkpoint made
+Configure app for Heroku deployment
+just now
+•
+
+Scroll to latest
+Assistant mode
+
+advanced
+Claude 4.0 Sonnet
+
+Ask Assistant, use @ to include specific files...
+# This is a replit for full-stack Javascript/TypeScript projects
+# It is has additional configs typical and useful for developers of projects like Vite
+
+hidden=[".config", ".gitignore", ".github", "node_modules", "pnpm-lock.yaml", "tsconfig.json", "tsconfig.node.json", "vite.config.ts"]
+
+# onBoot=['echo', '$PATH'] # ⚠ node is not in env, yet
+# onBoot=['echo', 'rebooted..'] # Runs on reboot, very limited ENV vars
+# compile="npm i" # No runtime ENV vars
+# run = ["npm", "run", "dev"] # Use TOML's """ for a multiline bash script
+run = """
+source ./.config/bashrc
+echo NodeJS Version: $(node --version)
+clear
+bash --norc
+""" # "
+
+entrypoint = ".replit"
+modules = ["nodejs-18"]
+
+# [[ports]]
+# localPort = 5173
+# remotePort = 80
+
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin:./node_modules/.bin"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global" # Global install support
+npm_config_yes="true" # This is a safe space, don't ask stupid questions
+NODE_OPTIONS="--max_old_space_size=384"
+# EDITOR="replit-git-editor" # Not reliable, use curl replspace instead
+#NODE_NO_WARNINGS="1"
+
+# Disables UPM, which BREAKS with PNPM, NPM v9, PNPM/Turbo/Yarn/Deno/Bun etc
+[packager]
+language = "no" # nodejs-npm / nodejs-yarn
+ignoredPaths = ["."] # disables guessImports
+
+[languages.typescript]
+pattern = "**/{*.ts,*.js,*.tsx,*.jsx}"
+syntax = "typescript"
+ 
+  [languages.typescript.languageServer]
+  start = [ "typescript-language-server", "--stdio" ]
+
+# CWD is not supported
+#   As a workaround, use Node 19 with --import and a helper script that CD's to a directory based on env vars
+[debugger]
+support = true
+
+  [debugger.interactive]
+  transport = "localhost:0"
+  startCommand = [ "dap-node" ]
+
+  [debugger.interactive.initializeMessage]
+  command = "initialize"
+  type = "request"
+
+  [debugger.interactive.initializeMessage.arguments]
+  clientID = "replit"
+  clientName = "replit.com"
+Selection deleted
+
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const mineflayer = require('mineflayer');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+// Store active bots
+const activeBots = new Map();
+let botCounter = 0;
+
+// Middleware
+app.use(express.static('public'));
+app.use(express.json());
+
+// Serve the main page
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// API Routes
+app.post('/api/create-bot', (req, res) => {
+    const { username, host, port, password, loginType, version } = req.body;
+    
+    try {
+        const botId = `bot_${++botCounter}`;
+        createBot(botId, { username, host, port, password, loginType, version });
+        res.json({ success: true, botId, message: 'Bot created successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/disconnect-bot/:botId', (req, res) => {
+    const { botId } = req.params;
+    
+    if (activeBots.has(botId)) {
+        const botData = activeBots.get(botId);
+        botData.bot.quit();
+        activeBots.delete(botId);
+        
+        io.emit('bot-disconnected', { botId });
+        res.json({ success: true, message: 'Bot disconnected' });
+    } else {
+        res.status(404).json({ success: false, message: 'Bot not found' });
+
+10s
+ • 
+Just now
+Port :5000 opened on
+/
+Ready to share with the world?
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Bot Minecraft Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Mineflayer Bot Manager</title>
     <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Multi-Bot Minecraft Dashboard</h1>
-            <div class="server-info">
-                <span>Active Bots: <span id="active-bots">0</span>/50</span>
-            </div>
-        </header>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        <div class="controls">
-            <button id="add-bot-btn" class="btn btn-primary">Add New Bot</button>
-            <button id="remove-all-btn" class="btn btn-danger">Remove All Bots</button>
-            <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
-        </div>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
 
-        <!-- Add Bot Modal -->
-        <div id="add-bot-modal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>Add New Bot</h2>
-                <form id="bot-form">
-                    <label for="bot-username">Username:</label>
-                    <input type="text" id="bot-username" required>
-                    
-                    <label for="bot-password">Password (optional):</label>
-                    <input type="text" id="bot-password">
-                    
-                    <label for="bot-host">Host:</label>
-                    <input type="text" id="bot-host" value="localmc.club">
-                    
-                    <label for="bot-port">Port:</label>
-                    <input type="number" id="bot-port" value="23028">
-                    
-                    <label for="bot-version">Version:</label>
-                    <input type="text" id="bot-version" value="1.18.2">
-                    
-                    <label>
-                        <input type="checkbox" id="bot-auto-reconnect" checked>
-                        Auto Reconnect
-                    </label>
-                    
-                    <label for="bot-proxy">Proxy (optional):</label>
-                    <select id="bot-proxy">
-                        <option value="">Direct</option>
-                        <!-- Opsi proxy akan diisi oleh script.js -->
-                    </select>
-                    
-                    <button type="submit" class="btn btn-primary">Create Bot</button>
-                </form>
-            </div>
-        </div>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-        <div class="main-content">
-            <div class="bots-grid" id="bots-grid">
-                <!-- Bot cards will be inserted here -->
-            </div>
-        </div>
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
 
-        <div class="stats-section">
-            <div class="playtime-stats">
-                <h3>Player Statistics</h3>
-                <div class="stats-tabs">
-                    <button class="tab-btn active" data-tab="weekly">Weekly</button>
-                    <button class="tab-btn" data-tab="monthly">Monthly</button>
-                    <button class="tab-btn" data-tab="top">Top Players</button>
-                </div>
-                <div id="stats-content" class="stats-content">
-                    <!-- Stats content will be loaded here -->
-                </div>
-            </div>
-        </div>
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
 
-        <div class="stats-section">
-            <div class="profanity-stats">
-                <h3>Profanity Statistics</h3>
-                <div class="stats-tabs">
-                    <button class="tab-btn active" data-tab="profanity-weekly">Weekly</button>
-                    <button class="tab-btn" data-tab="profanity-monthly">Monthly</button>
-                    <button class="tab-btn" data-tab="profanity-users">Top Users</button>
-                    <button class="tab-btn" data-tab="profanity-words">Top Words</button>
-                </div>
-                <div id="profanity-stats-content" class="stats-content">
-                    <!-- Profanity stats content will be loaded here -->
-                </div>
-            </div>
-        </div>
+        .form-group {
+            margin-bottom: 15px;
+        }
 
-        <div class="stats-section">
-            <div class="chat-stats">
-                <h3>Chat Statistics</h3>
-                <div class="stats-tabs">
-                    <button class="tab-btn active" data-tab="top-chatters">Top Chatters</button>
-                    <button class="tab-btn" data-tab="player-chat">Player Chat History</button>
-                </div>
-                <div id="chat-stats-content" class="stats-content">
-                    <!-- Chat stats content will be loaded here -->
-                </div>
-                <div id="player-search" style="display: none; margin-top: 15px;">
-                    <input type="text" id="player-name-input" placeholder="Enter player name (e.g., NayraVxy_)" style="width: 200px; padding: 5px; margin-right: 10px;">
-                    <button id="search-player-btn" class="btn btn-primary">Search</button>
-                </div>
-            </div>
-        </div>
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
 
-        <div class="global-chat">
-            <h3>Global Chat</h3>
-            <div id="console-output" class="console-output"></div>
-            <div class="chat-input-container">
-                <select id="chat-target">
-                    <option value="all">All Bots</option>
-                </select>
-                <input type="text" id="chat-input" placeholder="Enter command or message...">
-                <button id="send-btn" class="btn btn-primary">Send</button>
-            </div>
-        </div>
-    </div>
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
 
-    <script src="script.js"></script>
-</body>
-</html>
+        input:focus, select:focus {
+Loading... - Replit

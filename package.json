@@ -1,8 +1,15 @@
 {
   "name": "mineflayer-bot-manager",
   "version": "1.0.0",
+  "description": "Minecraft Bot Manager using Mineflayer",
+  "main": "Index.js",
   "scripts": {
-    "start": "node Index.js"
+    "start": "node Index.js",
+    "dev": "node Index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
   "dependencies": {
     "express": "^5.1.0",
@@ -12,8 +19,5 @@
     "socks5-client": "^1.2.8",
     "sqlite3": "^5.1.7",
     "yarm": "^0.4.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

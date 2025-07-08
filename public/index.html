@@ -84,18 +84,88 @@
             margin-top: 20px;
         }
         .bot-item {
-            background-color: #f5f5f5;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
+            background-color: #f8f9fa;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 12px;
             border-left: 4px solid #4CAF50;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        .bot-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .bot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .bot-info {
+            flex: 1;
+        }
+        .bot-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .bot-title strong {
+            font-size: 18px;
+            color: #333;
+        }
+        .bot-server {
+            background-color: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+        .bot-stats {
+            display: flex;
+            gap: 15px;
+            align-items: center;
         }
         .bot-status {
             font-weight: bold;
-            color: #4CAF50;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .bot-status.connected {
+            background-color: #d4edda;
+            color: #155724;
         }
         .bot-status.disconnected {
-            color: #f44336;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .health-indicator, .food-indicator {
+            font-size: 12px;
+            color: #666;
+            background-color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .bot-features {
+            display: flex;
+            gap: 10px;
+        }
+        .feature-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .feature-badge.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .feature-badge.inactive {
+            background-color: #f8d7da;
+            color: #721c24;
         }
         .chat-box {
             height: 200px;
@@ -126,17 +196,82 @@
             flex: 1;
             margin: 0;
         }
-        .chat-input {
+        .command-section {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .command-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #495057;
+            font-size: 14px;
+        }
+        .command-input {
             display: flex;
             gap: 10px;
-            margin-top: 10px;
+            align-items: stretch;
         }
-        .chat-input input {
+        .command-field {
+            flex: 4;
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            margin: 0;
+            height: 45px;
+            width: 100%;
+            resize: none;
+        }
+        .command-field:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+        .send-btn {
             flex: 1;
+            padding: 12px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
             margin: 0;
+            max-width: 100px;
+            height: 45px;
+            font-size: 14px;
         }
-        .chat-input button {
-            margin: 0;
+        .send-btn:hover {
+            background-color: #45a049;
+        }
+        .farm-toggle {
+            background-color: #17a2b8;
+        }
+        .farm-toggle:hover {
+            background-color: #138496;
+        }
+        .broadcast-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .broadcast-section .form-group {
+            margin-bottom: 10px;
+        }
+        .broadcast-section select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
         }
         @media (max-width: 768px) {
             .row {
@@ -163,12 +298,12 @@
 
                     <div class="form-group">
                         <label for="host">Server Host:</label>
-                        <input type="text" id="host" name="host" value="localhost" required>
+                        <input type="text" id="host" name="host" value="localmc.club" required>
                     </div>
 
                     <div class="form-group">
                         <label for="port">Port:</label>
-                        <input type="number" id="port" name="port" value="25565" required>
+                        <input type="number" id="port" name="port" value="23028" required>
                     </div>
 
                     <div class="form-group">
@@ -198,6 +333,22 @@
                 <div id="logs" class="logs">
                     <div>Welcome to Mineflayer Bot Manager</div>
                     <div>Create a bot to get started...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Broadcast Chat</h2>
+            <div class="broadcast-section">
+                <div class="form-group">
+                    <label for="broadcastTarget">Send to:</label>
+                    <select id="broadcastTarget">
+                        <option value="all">All Bots</option>
+                    </select>
+                </div>
+                <div class="command-input">
+                    <input type="text" id="broadcastMessage" placeholder="Type message to send to selected bot(s)..." class="command-field">
+                    <button onclick="sendBroadcast()" class="send-btn">Send</button>
                 </div>
             </div>
         </div>
@@ -314,16 +465,49 @@
                 const response = await fetch('/api/bots');
                 const bots = await response.json();
 
+                // Update broadcast target dropdown
+                const broadcastTarget = document.getElementById('broadcastTarget');
+                const currentValue = broadcastTarget.value;
+                broadcastTarget.innerHTML = '<option value="all">All Bots</option>';
+                
+                bots.forEach(bot => {
+                    const option = document.createElement('option');
+                    option.value = bot.id;
+                    option.textContent = `${bot.username} (${bot.host}:${bot.port})`;
+                    broadcastTarget.appendChild(option);
+                });
+                
+                // Restore previous selection if it still exists
+                if (currentValue && Array.from(broadcastTarget.options).some(opt => opt.value === currentValue)) {
+                    broadcastTarget.value = currentValue;
+                }
+
                 if (bots.length === 0) {
                     botsList.innerHTML = '<p>No active bots. Create one above to get started.</p>';
                     return;
                 }
+
+                // Store current input values before refreshing
+                const inputValues = {};
+                const existingInputs = botsList.querySelectorAll('input[id^="chatInput_"]');
+                existingInputs.forEach(input => {
+                    inputValues[input.id] = input.value;
+                });
 
                 botsList.innerHTML = '';
 
                 bots.forEach(bot => {
                     const botElement = createBotElement(bot);
                     botsList.appendChild(botElement);
+                    
+                    // Restore input value if it existed
+                    const inputId = `chatInput_${bot.id}`;
+                    if (inputValues[inputId]) {
+                        const restoredInput = document.getElementById(inputId);
+                        if (restoredInput) {
+                            restoredInput.value = inputValues[inputId];
+                        }
+                    }
                 });
             } catch (error) {
                 addLog(`❌ Error refreshing bots list: ${error.message}`);
@@ -334,26 +518,38 @@
             const botDiv = document.createElement('div');
             botDiv.className = 'bot-item';
             botDiv.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>${bot.username}</strong> - ${bot.host}:${bot.port}
-                        <br>
-                        <span class="bot-status ${bot.status === 'connected' ? '' : 'disconnected'}">
-                            ${bot.status.toUpperCase()}
-                        </span>
-                        ${bot.status === 'connected' ? `- Health: ${bot.health}/20, Food: ${bot.food}/20` : ''}
+                <div class="bot-header">
+                    <div class="bot-info">
+                        <div class="bot-title">
+                            <strong>${bot.username}</strong>
+                            <span class="bot-server">${bot.host}:${bot.port}</span>
+                        </div>
+                        <div class="bot-stats">
+                            <span class="bot-status ${bot.status === 'connected' ? 'connected' : 'disconnected'}">
+                                ● ${bot.status.toUpperCase()}
+                            </span>
+                            ${bot.status === 'connected' ? `
+                                <span class="health-indicator">❤️ ${bot.health}/20</span>
+                                <span class="food-indicator">🍖 ${bot.food}/20</span>
+                            ` : ''}
+                        </div>
                     </div>
-                    <div>
-                        ${bot.autoFarm ? '🚜 Auto Farm: ON' : '🚜 Auto Farm: OFF'}
+                    <div class="bot-features">
+                        <span class="feature-badge ${bot.autoFarm ? 'active' : 'inactive'}">
+                            🚜 Auto Farm: ${bot.autoFarm ? 'ON' : 'OFF'}
+                        </span>
                     </div>
                 </div>
                 <div class="bot-controls">
                     <button onclick="disconnectBot('${bot.id}')" class="danger">Disconnect</button>
-                    <button onclick="toggleAutoFarm('${bot.id}')">${bot.autoFarm ? 'Stop Auto Farm' : 'Start Auto Farm'}</button>
+                    <button onclick="toggleAutoFarm('${bot.id}')" class="farm-toggle">${bot.autoFarm ? 'Stop Auto Farm' : 'Start Auto Farm'}</button>
                 </div>
-                <div class="chat-input">
-                    <input type="text" id="chatInput_${bot.id}" placeholder="Type message...">
-                    <button onclick="sendChat('${bot.id}')">Send</button>
+                <div class="command-section">
+                    <label for="chatInput_${bot.id}" class="command-label">Send Command/Chat:</label>
+                    <div class="command-input">
+                        <input type="text" id="chatInput_${bot.id}" placeholder="Type command or message (e.g., /help, Hello world)..." class="command-field">
+                        <button onclick="sendChat('${bot.id}')" class="send-btn">Send</button>
+                    </div>
                 </div>
             `;
             return botDiv;
@@ -426,19 +622,49 @@
             }
         }
 
+        async function sendBroadcast() {
+            const target = document.getElementById('broadcastTarget').value;
+            const message = document.getElementById('broadcastMessage').value.trim();
+
+            if (!message) return;
+
+            try {
+                const response = await fetch('/api/broadcast-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ target, message })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    addLog(`📢 Broadcast sent to ${target === 'all' ? 'all bots' : target}: ${message}`);
+                    document.getElementById('broadcastMessage').value = '';
+                } else {
+                    addLog(`❌ Failed to send broadcast: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`❌ Error sending broadcast: ${error.message}`);
+            }
+        }
+
         // Add enter key support for chat inputs
         document.addEventListener('keypress', (e) => {
             if (e.target.id && e.target.id.startsWith('chatInput_') && e.key === 'Enter') {
                 const botId = e.target.id.replace('chatInput_', '');
                 sendChat(botId);
             }
+            if (e.target.id === 'broadcastMessage' && e.key === 'Enter') {
+                sendBroadcast();
+            }
         });
 
         // Initial load
         refreshBotsList();
 
-        // Auto refresh every 5 seconds
-        setInterval(refreshBotsList, 5000);
+        // Auto refresh every 15 seconds to prevent input clearing
+        setInterval(refreshBotsList, 15000);
     </script>
 </body>
 </html>
